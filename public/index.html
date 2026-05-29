@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Intranet Chat</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css?v=11" />
+</head>
+
+<body>
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <div class="logo-mark">IC</div>
+        <span>Intranet Chat</span>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="tab-btn active" data-tab="login">Masuk</button>
+        <button class="tab-btn" data-tab="register">Daftar</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <div class="field">
+          <label>Username / Email</label>
+          <input type="text" id="login-username" placeholder="username atau email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required />
+        </div>
+        <div id="login-error" class="error-msg"></div>
+        <button type="submit" class="btn-primary">Masuk</button>
+      </form>
+
+      <form id="register-form" class="auth-form hidden">
+        <div class="field">
+          <label>Nama Lengkap</label>
+          <input type="text" id="reg-name" placeholder="Nama yang ditampilkan" required />
+        </div>
+        <div class="field">
+          <label>Username</label>
+          <input type="text" id="reg-username" placeholder="username unik" required />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="reg-email" placeholder="email@perusahaan.com" required />
+        </div>
+        <div class="field">
+          <label>Divisi</label>
+          <select id="reg-division" required>
+            <option value="" disabled selected>Pilih Divisi</option>
+            <option value="marketing">Marketing</option>
+            <option value="sdm">SDM</option>
+            <option value="keuangan">Keuangan</option>
+            <option value="operasional">Operasional</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Jabatan</label>
+          <select id="reg-jabatan" required>
+            <option value="" disabled selected>Pilih Jabatan</option>
+            <option value="staff-Staff">Staf Biasa (Staff)</option>
+            <option value="management-SM">Section Manager (SM)</option>
+            <option value="top management-Direktur Umum">Direktur Umum (Top Management)</option>
+            <option value="top management-Wakil Direktur">Wakil Direktur (Top Management)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="reg-password" placeholder="Minimal 6 karakter" required />
+        </div>
+        <div id="register-error" class="error-msg"></div>
+        <button type="submit" class="btn-primary">Buat Akun</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app" class="app hidden">
+
+    <!-- ACTIVITY BAR -->
+    <nav class="activity-bar">
+      <div class="activity-logo" title="Intranet Chat">IC</div>
+      <div class="activity-tabs">
+        <button class="activity-tab-btn active" id="tab-btn-chat" onclick="switchSidebarTab('chat')"
+          title="Obrolan & Pesan">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+        <button class="activity-tab-btn" id="tab-btn-notion" onclick="switchSidebarTab('notion')"
+          title="Notion Workspace">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+        </button>
+        <button class="activity-tab-btn" id="tab-btn-files" onclick="switchSidebarTab('files')" title="Folder Bersama">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="activity-footer">
+        <button id="theme-toggle-btn" class="activity-icon-btn" title="Ubah Tema">
+          <span class="theme-icon">🌙</span>
+        </button>
+        <button id="btn-logout" class="activity-icon-btn" title="Keluar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">
+          <span id="sidebar-name" class="user-name"></span>
+          <span class="online-dot"></span>
+        </div>
+        <button id="btn-sidebar-collapse" class="icon-btn" title="Ciutkan Sidebar" style="margin-left: auto;"
+          onclick="toggleSidebar()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="11 17 6 12 11 7" />
+            <polyline points="18 17 13 12 18 7" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="sidebar-section menu-section"
+        style="border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 4px;">
+        <ul class="room-list">
+          <li id="btn-sharing-folder" class="room-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              class="room-hash">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <div class="room-info">
+              <div class="room-name">Folder Bersama</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- NOTION WORKSPACE SECTION -->
+      <div class="sidebar-section notion-section"
+        style="border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 4px;">
+        <div class="section-label" id="toggle-notion-btn" onclick="toggleNotionCollapse()">
+          <span class="toggle-arrow" id="notion-arrow">▾</span>
+          <span>Workspace</span>
+          <button id="btn-new-notion-page" class="icon-btn-sm" title="Buat Halaman Baru" style="margin-left: auto;"
+            onclick="createNewNotionPage(event)">+</button>
+        </div>
+        <ul id="notion-page-list" class="room-list notion-tree-list">
+          <!-- Special Notion Calendar link -->
+          <li id="btn-notion-calendar" class="room-item notion-special-item" onclick="switchToNotionCalendar()">
+            <span class="room-hash" style="font-style: normal; margin-right: 8px;">📅</span>
+            <div class="room-info">
+              <div class="room-name">Kalender Gabungan</div>
+            </div>
+          </li>
+          <!-- Dynamic pages list populated via JS -->
+        </ul>
+      </div>
+
+      <div class="sidebar-section rooms-section">
+        <div class="section-label" id="toggle-rooms-btn">
+          <span class="toggle-arrow">▾</span>
+          <span>Ruangan</span>
+          <button id="btn-new-room" class="icon-btn-sm" title="Buat ruangan baru" style="margin-left: auto;">+</button>
+        </div>
+        <ul id="room-list" class="room-list"></ul>
+      </div>
+
+      <div class="sidebar-section users-section border-top">
+        <div class="section-label" id="toggle-users-btn">
+          <span class="toggle-arrow">▾</span>
+          <span>Pesan Langsung</span>
+        </div>
+        <ul id="user-list" class="room-list"></ul>
+      </div>
+
+    </aside>
+
+    <!-- CHAT AREA -->
+    <main class="chat-area">
+
+      <!-- Empty state -->
+      <div id="empty-state" class="empty-state-view">
+        <div class="empty-header">
+          <button id="empty-sidebar-toggle" class="sidebar-toggle-btn" title="Tampilkan Sidebar"
+            onclick="toggleSidebar()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="empty-content">
+          <div class="empty-icon">💬</div>
+          <p>Pilih ruangan untuk mulai ngobrol</p>
+        </div>
+      </div>
+
+      <!-- Chat view -->
+      <div id="chat-view" class="hidden">
+        <div class="chat-header">
+          <button id="chat-sidebar-toggle" class="sidebar-toggle-btn" title="Tampilkan Sidebar"
+            onclick="toggleSidebar()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="chat-header-info">
+            <span id="chat-room-name" class="room-title"></span>
+            <span id="chat-members-count" class="room-subtitle"></span>
+          </div>
+        </div>
+
+        <div id="messages-container" class="messages-container">
+          <div id="messages-list" class="messages-list"></div>
+          <div id="typing-indicator" class="typing-indicator hidden"></div>
+        </div>
+
+        <div class="chat-input-area">
+          <textarea id="message-input" class="message-input" placeholder="Ketik pesan..." rows="1"></textarea>
+          <button id="btn-send" class="btn-send" title="Kirim">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sharing Folder view -->
+      <div id="sharing-folder-view" class="hidden sharing-folder-view">
+        <div class="sharing-cover-wrapper">
+          <div class="sharing-cover"></div>
+          <div class="sharing-emoji-icon">📂</div>
+        </div>
+        <div class="sharing-header">
+          <button id="sharing-sidebar-toggle" class="sidebar-toggle-btn" title="Tampilkan Sidebar"
+            onclick="toggleSidebar()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="sharing-header-info">
+            <h2>Folder Bersama</h2>
+            <span class="sharing-subtitle">Bagikan dokumen PO dan berkas lainnya antar divisi</span>
+          </div>
+        </div>
+
+        <!-- Stats Cards Grid -->
+        <div class="stats-grid">
+          <div class="stats-card card-in-today">
+            <div class="stats-icon">📥</div>
+            <div class="stats-info">
+              <span class="stats-label">Masuk Hari Ini</span>
+              <span class="stats-value" id="stats-in-today">0</span>
+            </div>
+          </div>
+          <div class="stats-card card-out-today">
+            <div class="stats-icon">📤</div>
+            <div class="stats-info">
+              <span class="stats-label">Keluar Hari Ini</span>
+              <span class="stats-value" id="stats-out-today">0</span>
+            </div>
+          </div>
+          <div class="stats-card card-in-total">
+            <div class="stats-icon">📂</div>
+            <div class="stats-info">
+              <span class="stats-label">Total Masuk</span>
+              <span class="stats-value" id="stats-in-total">0</span>
+            </div>
+          </div>
+          <div class="stats-card card-out-total">
+            <div class="stats-icon">📈</div>
+            <div class="stats-info">
+              <span class="stats-label">Total Keluar</span>
+              <span class="stats-value" id="stats-out-total">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Controls -->
+        <div class="sharing-tabs">
+          <button class="sharing-tab-btn active" data-tab="masuk">Dokumen Masuk</button>
+          <button class="sharing-tab-btn" data-tab="keluar">Dokumen Keluar</button>
+          <button class="sharing-tab-btn" id="tab-divisi-btn" data-tab="divisi">Dokumen Divisi</button>
+          <button class="sharing-tab-btn" id="tab-semua-btn" data-tab="semua">Semua Dokumen</button>
+        </div>
+
+        <!-- Table Filters & Search -->
+        <div class="sharing-controls">
+          <div class="search-box">
+            <input type="text" id="sharing-search" placeholder="Cari nomor, tipe, nama dokumen..." />
+          </div>
+          <div class="filter-group">
+            <select id="filter-month">
+              <option value="">Semua Bulan</option>
+              <option value="0">Januari</option>
+              <option value="1">Februari</option>
+              <option value="2">Maret</option>
+              <option value="3">April</option>
+              <option value="4">Mei</option>
+              <option value="5">Juni</option>
+              <option value="6">Juli</option>
+              <option value="7">Agustus</option>
+              <option value="8">September</option>
+              <option value="9">Oktober</option>
+              <option value="10">November</option>
+              <option value="11">Desember</option>
+            </select>
+            <select id="filter-year">
+              <option value="">Semua Tahun</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+            </select>
+          </div>
+          <button id="btn-upload-doc" class="btn-primary-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="margin-right: 4px; vertical-align: middle;">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+            </svg>
+            Unggah Dokumen
+          </button>
+        </div>
+
+        <!-- Table Grid -->
+        <div class="table-wrapper">
+          <table class="sharing-table">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Pengirim</th>
+                <th>Tipe</th>
+                <th>Nama & Nomor Dokumen</th>
+                <th>Penerima</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="sharing-table-body">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+          <div id="sharing-empty" class="sharing-empty hidden">
+            <p>Tidak ada dokumen yang sesuai filter.</p>
+          </div>
+        </div>
+        <!-- Pagination Controls -->
+        <div id="sharing-pagination" class="sharing-pagination hidden">
+          <button id="btn-sharing-prev" class="btn-secondary-sm" onclick="changeSharingPage(-1)">←</button>
+          <span id="sharing-page-info" class="sharing-page-info">Halaman 1 dari 1</span>
+          <button id="btn-sharing-next" class="btn-secondary-sm" onclick="changeSharingPage(1)">→</button>
+        </div>
+      </div>
+
+      <!-- Notion Workspace view -->
+      <div id="notion-workspace-view" class="hidden notion-workspace-view">
+        <!-- Cover & Icon wrapper -->
+        <div class="notion-cover-wrapper">
+          <div id="notion-cover" class="notion-cover"></div>
+          <div class="notion-cover-actions">
+            <button id="btn-change-cover" class="btn-cover-action" onclick="changeNotionCover()">Ganti Cover</button>
+          </div>
+          <div id="notion-emoji-icon" class="notion-emoji-icon" title="Klik untuk ubah emoji"
+            onclick="toggleEmojiPicker(event, 'page')">📄</div>
+        </div>
+
+        <!-- Page Header -->
+        <div class="notion-header">
+          <div style="display: flex; align-items: center; width: 100%;">
+            <button id="notion-sidebar-toggle" class="sidebar-toggle-btn" title="Tampilkan Sidebar"
+              onclick="toggleSidebar()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <div class="notion-breadcrumbs" id="notion-breadcrumbs">
+              <!-- Breadcrumbs go here -->
+            </div>
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+              <button id="btn-notion-edit-cancel" class="btn-secondary-sm hidden"
+                onclick="cancelNotionEdit()">Batal</button>
+              <button id="btn-notion-edit-toggle" class="btn-primary-sm" onclick="toggleNotionEditMode()">Ubah</button>
+              <button id="btn-notion-delete" class="btn-danger-sm" onclick="deleteCurrentNotionPage()">Hapus</button>
+            </div>
+          </div>
+
+          <!-- Page Title input -->
+          <div class="notion-title-container">
+            <input type="text" id="notion-page-title" class="notion-page-title-input" placeholder="Tanpa Judul"
+              onblur="saveNotionTitle()" />
+          </div>
+          <!-- Page Access Control Container -->
+          <div id="notion-page-access-container" class="notion-page-access-container"></div>
+        </div>
+
+        <!-- Wiki/Page Content View (for regular pages) -->
+        <div id="notion-page-content-area" class="notion-content-area">
+          <!-- Editor (Hidden in read-only mode) -->
+          <div id="notion-editor-wrapper" class="notion-editor-wrapper hidden">
+            <div class="editor-toolbar">
+              <button class="editor-tool-btn" onclick="insertEditorTag('bold')" title="Tebal"><b>B</b></button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('italic')" title="Miring"><i>I</i></button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('code')"
+                title="Inline Code"><code>&lt;&gt;</code></button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('h1')" title="Header 1">H1</button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('h2')" title="Header 2">H2</button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('h3')" title="Header 3">H3</button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('bullet')" title="Daftar Bulat">• List</button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('todo')" title="To-Do List">☑ To-Do</button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('codeblock')" title="Code Block">Code
+                Block</button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('image')" title="Embed Gambar">Gambar</button>
+              <button class="editor-tool-btn" onclick="insertEditorTag('video')" title="Embed Video">Video</button>
+            </div>
+            <textarea id="notion-editor-textarea" class="notion-editor-textarea"
+              placeholder="Tulis catatan Anda di sini... Gunakan Markdown sederhana atau klik toolbar."></textarea>
+            <div class="editor-help-text">Dukungan: **tebal**, *miring*, `code`, # H1, ## H2, - List, [ ] To-Do,
+              ![](url-gambar), @[video](url-video)</div>
+          </div>
+
+          <!-- Read-only HTML render / Preview -->
+          <div id="notion-preview-area" class="notion-preview-area markdown-body">
+            <!-- Dynamically populated HTML -->
+          </div>
+
+          <!-- Sub-pages List Container -->
+          <div class="notion-subpages-section">
+            <h4 style="margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">Sub-Halaman</h4>
+            <div class="notion-subpages-list" id="notion-subpages-list">
+              <!-- Dynamically populated sub-pages list -->
+            </div>
+            <button id="btn-add-subpage" class="btn-secondary-sm" style="margin-top: 8px;"
+              onclick="addSubpageToCurrent()">+ Tambah Sub-Halaman</button>
+          </div>
+        </div>
+
+        <!-- Database View Layout (for database pages) -->
+        <div id="notion-database-content-area" class="notion-content-area hidden">
+          <!-- View switcher Tabs -->
+          <div class="notion-db-tabs">
+            <button class="notion-db-tab-btn active" data-view="table" onclick="switchDbView('table')">📋 Tabel</button>
+            <button class="notion-db-tab-btn" data-view="board" onclick="switchDbView('board')">🗂️ Board</button>
+            <button class="notion-db-tab-btn" data-view="calendar" onclick="switchDbView('calendar')">📅
+              Kalender</button>
+            <button class="notion-db-tab-btn" data-view="gallery" onclick="switchDbView('gallery')">🖼️ Galeri</button>
+            <button class="notion-db-tab-btn" data-view="list" onclick="switchDbView('list')">📝 Daftar</button>
+            <button class="notion-db-tab-btn" data-view="timeline" onclick="switchDbView('timeline')">📊
+              Timeline</button>
+          </div>
+
+          <!-- Filters & Actions Toolbar -->
+          <div class="notion-db-controls">
+            <div class="db-search-box">
+              <input type="text" id="notion-db-search" placeholder="Cari di database..." oninput="handleDbFilter()" />
+            </div>
+            <div class="db-filter-group">
+              <select id="filter-db-status" onchange="handleDbFilter()">
+                <option value="">Semua Status</option>
+                <option value="To Do">To Do</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Done">Done</option>
+              </select>
+              <select id="filter-db-priority" onchange="handleDbFilter()">
+                <option value="">Semua Prioritas</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+              <select id="filter-db-assignee" onchange="handleDbFilter()">
+                <option value="">Semua Divisi</option>
+                <option value="marketing">Marketing</option>
+                <option value="sdm">SDM</option>
+                <option value="keuangan">Keuangan</option>
+                <option value="operasional">Operasional</option>
+              </select>
+            </div>
+            <button id="btn-db-add-row" class="btn-primary-sm" onclick="addNewDatabaseRow()">+ Tambah Data</button>
+          </div>
+
+          <!-- Main Dynamic Container for Database Views -->
+          <div id="notion-db-view-container" class="notion-db-view-container">
+            <!-- Selected view (Table, Board, Calendar, Gallery, List, Timeline) will be rendered here -->
+          </div>
+        </div>
+
+        <!-- Integrated Calendar View -->
+        <div id="notion-calendar-view-area" class="notion-content-area hidden">
+          <div class="calendar-nav-header">
+            <h3 id="notion-calendar-month-title">Bulan Tahun</h3>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-calendar-prev" class="btn-secondary-sm" onclick="navigateNotionCalendar(-1)">←</button>
+              <button id="btn-calendar-today" class="btn-secondary-sm" onclick="navigateNotionCalendar(0)">Hari
+                Ini</button>
+              <button id="btn-calendar-next" class="btn-secondary-sm" onclick="navigateNotionCalendar(1)">→</button>
+            </div>
+          </div>
+          <div id="notion-calendar-grid" class="notion-calendar-grid">
+            <!-- 7 columns, dynamic rows -->
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL: New Room -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Buat Ruangan Baru</h3>
+        <button id="modal-close" class="icon-btn">✕</button>
+      </div>
+      <div class="field">
+        <label>Nama Ruangan</label>
+        <input type="text" id="new-room-name" placeholder="contoh: tim-marketing" />
+      </div>
+      <button id="btn-create-room" class="btn-primary" style="margin-top:12px">Buat</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Upload Document -->
+  <div id="modal-upload-overlay" class="modal-overlay hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3>Unggah Dokumen Baru</h3>
+        <button id="modal-upload-close" class="icon-btn">✕</button>
+      </div>
+      <form id="doc-upload-form" class="auth-form">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="field">
+            <label>Tipe Dokumen</label>
+            <select id="upload-doc-type" required>
+              <option value="" disabled selected>Pilih Tipe</option>
+              <option value="PO">PO (Purchase Order)</option>
+              <option value="FPTK">FPTK</option>
+              <option value="SPK">SPK</option>
+              <option value="SPH">SPH</option>
+              <option value="LOI">LOI</option>
+              <option value="MRA">MRA</option>
+              <option value="Kontrak">Kontrak</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sub-Tipe</label>
+            <input type="text" id="upload-sub-tipe" placeholder="Contoh: PO Marketing" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Proyek</label>
+          <select id="upload-project-name" required>
+            <option value="" disabled selected>Pilih Proyek</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="field">
+            <label>Nomor Dokumen</label>
+            <input type="text" id="upload-doc-number" placeholder="Contoh: 001/PO-MKT/2026" required />
+          </div>
+          <div class="field">
+            <label>Nama Dokumen</label>
+            <input type="text" id="upload-doc-name" placeholder="Contoh: Dokumen PO Vendor A" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Tanggal Dokumen (Backdate)</label>
+          <input type="date" id="upload-doc-date" required />
+        </div>
+
+        <div class="field">
+          <label>Deskripsi (Opsional)</label>
+          <textarea id="upload-description" rows="2"
+            style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); outline: none; font-family: var(--font);"
+            placeholder="Keterangan tambahan..."></textarea>
+        </div>
+
+        <div class="field">
+          <label>Penerima</label>
+          <div id="upload-recipient-container">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Berkas File</label>
+          <div id="upload-dropzone" class="dropzone">
+            <span class="dropzone-icon">📁</span>
+            <span class="dropzone-text">Seret berkas ke sini atau klik untuk memilih</span>
+            <span id="upload-file-info" class="dropzone-file-info hidden"></span>
+            <input type="file" id="upload-file-input" style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx"
+              required />
+          </div>
+        </div>
+
+        <div id="upload-error" class="error-msg"></div>
+        <button type="submit" class="btn-primary">Kirim Dokumen</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Edit Document -->
+  <div id="modal-edit-overlay" class="modal-overlay hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3>Ubah Informasi Dokumen</h3>
+        <button id="modal-edit-close" class="icon-btn">✕</button>
+      </div>
+      <form id="doc-edit-form" class="auth-form">
+        <input type="hidden" id="edit-doc-id" />
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="field">
+            <label>Tipe Dokumen</label>
+            <select id="edit-doc-type" required>
+              <option value="" disabled selected>Pilih Tipe</option>
+              <option value="PO">PO (Purchase Order)</option>
+              <option value="FPTK">FPTK</option>
+              <option value="SPK">SPK</option>
+              <option value="SPH">SPH</option>
+              <option value="LOI">LOI</option>
+              <option value="MRA">MRA</option>
+              <option value="Kontrak">Kontrak</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Sub-Tipe</label>
+            <input type="text" id="edit-sub-tipe" placeholder="Contoh: PO Marketing" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Proyek</label>
+          <select id="edit-project-name" required>
+            <option value="" disabled selected>Pilih Proyek</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="field">
+            <label>Nomor Dokumen</label>
+            <input type="text" id="edit-doc-number" required />
+          </div>
+          <div class="field">
+            <label>Nama Dokumen</label>
+            <input type="text" id="edit-doc-name" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Tanggal Dokumen</label>
+          <input type="date" id="edit-doc-date" required />
+        </div>
+
+        <div class="field">
+          <label>Deskripsi (Opsional)</label>
+          <textarea id="edit-description" rows="2"
+            style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); outline: none; font-family: var(--font);"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Penerima</label>
+          <div id="edit-recipient-container">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <div id="edit-error" class="error-msg"></div>
+        <button type="submit" class="btn-primary">Simpan Perubahan</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notion Side-peek Backdrop & Panel -->
+  <div id="side-peek-backdrop" class="side-peek-backdrop hidden"></div>
+  <div id="side-peek-panel" class="side-peek-panel">
+    <div class="side-peek-header">
+      <button id="side-peek-close-btn" class="side-peek-action-btn" title="Tutup">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="side-peek-content">
+      <h2 id="peek-doc-name" class="peek-title">-</h2>
+
+      <div class="peek-properties">
+        <div class="peek-property-row">
+          <div class="peek-property-label">
+            <span class="prop-icon">🔢</span> Nomor Dokumen
+          </div>
+          <div class="peek-property-value" id="peek-doc-number">-</div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label">
+            <span class="prop-icon">🏷️</span> Tipe Dokumen
+          </div>
+          <div class="peek-property-value" id="peek-doc-type">-</div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label">
+            <span class="prop-icon">📁</span> Proyek
+          </div>
+          <div class="peek-property-value" id="peek-project-name">-</div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label">
+            <span class="prop-icon">👤</span> Pengirim
+          </div>
+          <div class="peek-property-value" id="peek-sender">-</div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label">
+            <span class="prop-icon">📅</span> Tanggal Unggah
+          </div>
+          <div class="peek-property-value" id="peek-tgl">-</div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label">
+            <span class="prop-icon">👥</span> Penerima
+          </div>
+          <div class="peek-property-value" id="peek-recipients">-</div>
+        </div>
+      </div>
+
+      <hr class="peek-divider" />
+
+      <div class="peek-section">
+        <h3 class="peek-section-title">Deskripsi</h3>
+        <div id="peek-description" class="peek-description-box">-</div>
+      </div>
+
+      <div class="peek-section" style="flex: 1; display: flex; flex-direction: column; min-height: 250px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 class="peek-section-title" style="margin-bottom: 0;">Lampiran & Pratinjau</h3>
+          <a id="peek-btn-download" href="#" class="btn-peek-download" download>Unduh File</a>
+        </div>
+        <div id="peek-preview-container" class="peek-preview-container">
+          <div id="peek-preview-placeholder" class="peek-preview-placeholder">
+            <span class="preview-icon">📄</span>
+            Pratinjau tidak tersedia untuk format file ini.<br />Silakan unduh dokumen untuk melihat.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMOJI PICKER POPUP -->
+  <div id="emoji-picker-popup" class="emoji-picker-popup hidden">
+    <div class="emoji-picker-grid">
+      <span class="emoji-option" onclick="selectEmoji('📄')">📄</span>
+      <span class="emoji-option" onclick="selectEmoji('📚')">📚</span>
+      <span class="emoji-option" onclick="selectEmoji('🏢')">🏢</span>
+      <span class="emoji-option" onclick="selectEmoji('💻')">💻</span>
+      <span class="emoji-option" onclick="selectEmoji('📅')">📅</span>
+      <span class="emoji-option" onclick="selectEmoji('💬')">💬</span>
+      <span class="emoji-option" onclick="selectEmoji('🎨')">🎨</span>
+      <span class="emoji-option" onclick="selectEmoji('🚀')">🚀</span>
+      <span class="emoji-option" onclick="selectEmoji('⚙️')">⚙️</span>
+      <span class="emoji-option" onclick="selectEmoji('🔒')">🔒</span>
+      <span class="emoji-option" onclick="selectEmoji('📊')">📊</span>
+      <span class="emoji-option" onclick="selectEmoji('📝')">📝</span>
+      <span class="emoji-option" onclick="selectEmoji('💡')">💡</span>
+      <span class="emoji-option" onclick="selectEmoji('🌐')">🌐</span>
+      <span class="emoji-option" onclick="selectEmoji('🏆')">🏆</span>
+      <span class="emoji-option" onclick="selectEmoji('📌')">📌</span>
+      <span class="emoji-option" onclick="selectEmoji('🔍')">🔍</span>
+      <span class="emoji-option" onclick="selectEmoji('✅')">✅</span>
+      <span class="emoji-option" onclick="selectEmoji('🔥')">🔥</span>
+      <span class="emoji-option" onclick="selectEmoji('⭐')">⭐</span>
+    </div>
+  </div>
+
+  <!-- Notion Database Row Side-peek Panel -->
+  <div id="notion-peek-backdrop" class="side-peek-backdrop hidden" onclick="closeNotionPeek()"></div>
+  <div id="notion-peek-panel" class="side-peek-panel" style="width: 480px; max-width: 90vw;">
+    <div class="side-peek-header">
+      <button id="notion-peek-close-btn" class="side-peek-action-btn" title="Tutup" onclick="closeNotionPeek()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div style="margin-left: auto; display: flex; gap: 8px;">
+        <button id="btn-notion-peek-save" class="btn-primary-sm" onclick="saveNotionPeek()">Simpan</button>
+        <button id="btn-notion-peek-delete" class="btn-danger-sm" onclick="deleteNotionPeek()">Hapus</button>
+      </div>
+    </div>
+    <div class="side-peek-content">
+      <!-- Emoji & Title -->
+      <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 20px;">
+        <div id="notion-peek-emoji" class="notion-emoji-icon"
+          style="position: relative; bottom: auto; left: auto; width: 38px; height: 38px; font-size: 22px; cursor: pointer; margin: 0; padding: 0; flex-shrink: 0;"
+          title="Ubah Emoji" onclick="toggleEmojiPicker(event, 'peek')">📄</div>
+        <input type="text" id="notion-peek-title" class="notion-page-title-input"
+          style="font-size: 20px; font-weight: bold; margin: 0; padding: 4px 8px; width: 100%; border: 1px solid var(--border); border-radius: 4px;"
+          placeholder="Tanpa Judul" />
+      </div>
+
+      <!-- Properties -->
+      <div class="peek-properties" style="margin-bottom: 20px;">
+        <div class="peek-property-row">
+          <div class="peek-property-label"><span class="prop-icon">📋</span> Status</div>
+          <div class="peek-property-value">
+            <select id="notion-peek-status" class="notion-prop-select">
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label"><span class="prop-icon">🔥</span> Prioritas</div>
+          <div class="peek-property-value">
+            <select id="notion-peek-priority" class="notion-prop-select">
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label"><span class="prop-icon">👥</span> Divisi / Assignee</div>
+          <div class="peek-property-value">
+            <select id="notion-peek-assignee" class="notion-prop-select">
+              <option value="">Tanpa Divisi</option>
+              <option value="marketing">Marketing</option>
+              <option value="sdm">SDM</option>
+              <option value="keuangan">Keuangan</option>
+              <option value="operasional">Operasional</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label"><span class="prop-icon">📅</span> Mulai Tanggal</div>
+          <div class="peek-property-value">
+            <input type="date" id="notion-peek-start-date" class="notion-prop-input" />
+          </div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label"><span class="prop-icon">⏰</span> Tenggat Waktu</div>
+          <div class="peek-property-value">
+            <input type="date" id="notion-peek-deadline" class="notion-prop-input" />
+          </div>
+        </div>
+
+        <div class="peek-property-row">
+          <div class="peek-property-label"><span class="prop-icon">📈</span> Progres (%)</div>
+          <div class="peek-property-value" style="display: flex; align-items: center; gap: 8px;">
+            <input type="number" id="notion-peek-progress" min="0" max="100" class="notion-prop-input"
+              style="width: 70px;" />
+            <span style="font-size: 12px; color: var(--text-muted);">%</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="peek-divider" />
+
+      <div class="peek-section" style="display: flex; flex-direction: column; margin-bottom: 24px;">
+        <h3 class="peek-section-title">Isi / Deskripsi Tugas</h3>
+        <textarea id="notion-peek-content"
+          style="width: 100%; min-height: 180px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); outline: none; font-family: var(--font); resize: vertical;"
+          placeholder="Tulis deskripsi detail tugas..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js?v=11"></script>
+</body>
+
+</html>

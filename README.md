@@ -34,8 +34,8 @@ npm install
 ### 2. Setup PostgreSQL
 Buat database baru dan jalankan schema:
 ```bash
-createdb resik_internal
-psql -d resik_internal -f schema.sql
+createdb resikinternal -U appuser
+psql -d resikinternal -U appuser -f schema.sql
 ```
 
 ### 3. Konfigurasi environment

@@ -844,7 +844,7 @@ function updateRoomPreview(roomId, content) {
 function appendMessage(msg) {
   const isOwn = msg.sender_id === currentUser.id;
   const isAdmin = currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator';
-  const canDelete = isAdmin;
+  const canDelete = isOwn || isAdmin;
   const initials = (msg.display_name || '?').slice(0, 2).toUpperCase();
   const time = new Date(msg.created_at).toLocaleTimeString('id-ID', {
     hour: '2-digit', minute: '2-digit',
@@ -1863,14 +1863,6 @@ function resolveRecipientSelections(containerId) {
         if (!resolvedRecipients.includes(groupLabel)) {
           resolvedRecipients.push(groupLabel);
         }
-        // Expand to individual users matching both
-        recipientsList.filter(u =>
-          (u.divisi || '').toLowerCase() === divName.toLowerCase() &&
-          (u.jabatan || '').toLowerCase() === jabName.toLowerCase() &&
-          u.username !== currentUser.username
-        ).forEach(u => {
-          if (!resolvedRecipients.includes(u.name)) resolvedRecipients.push(u.name);
-        });
       });
     });
   } else if (selectedDivs.length > 0) {
@@ -1878,24 +1870,12 @@ function resolveRecipientSelections(containerId) {
     selectedDivs.forEach(divName => {
       const groupLabel = `Divisi ${divName}`;
       if (!resolvedRecipients.includes(groupLabel)) resolvedRecipients.push(groupLabel);
-      recipientsList.filter(u =>
-        (u.divisi || '').toLowerCase() === divName.toLowerCase() &&
-        u.username !== currentUser.username
-      ).forEach(u => {
-        if (!resolvedRecipients.includes(u.name)) resolvedRecipients.push(u.name);
-      });
     });
   } else {
     // Only jabatan — this jabatan across all divisions
     selectedJabatan.forEach(jabName => {
       const groupLabel = `Jabatan ${jabName}`;
       if (!resolvedRecipients.includes(groupLabel)) resolvedRecipients.push(groupLabel);
-      recipientsList.filter(u =>
-        (u.jabatan || '').toLowerCase() === jabName.toLowerCase() &&
-        u.username !== currentUser.username
-      ).forEach(u => {
-        if (!resolvedRecipients.includes(u.name)) resolvedRecipients.push(u.name);
-      });
     });
   }
 

@@ -512,18 +512,27 @@ if (messageInput) {
     }
   });
 
+  let isTyping = false;
+  let typingThrottle = null;
+
   messageInput.addEventListener('input', () => {
     // Auto-resize
     messageInput.style.height = 'auto';
     messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + 'px';
 
-    // Typing indicator
+    // Typing indicator — throttled so only fires once per 300ms
     if (!currentRoomId) return;
-    socket.emit('typing', { room_id: currentRoomId, is_typing: true });
+    if (!isTyping) {
+      isTyping = true;
+      socket.emit('typing', { room_id: currentRoomId, is_typing: true });
+    }
+    clearTimeout(typingThrottle);
     clearTimeout(typingTimer);
+    typingThrottle = null;
     typingTimer = setTimeout(() => {
+      isTyping = false;
       socket.emit('typing', { room_id: currentRoomId, is_typing: false });
-    }, 2000);
+    }, 1500);
   });
 }
 
@@ -687,7 +696,8 @@ function renderUsers() {
       marketing: 'Marketing',
       sdm: 'SDM',
       keuangan: 'Keuangan',
-      operasional: 'Operasional'
+      operasional: 'Operasional',
+      it: 'IT'
     };
 
     const divLabel = divisionLabels[user.division] || 'Umum';
@@ -919,7 +929,8 @@ async function showApp() {
     marketing: 'Marketing',
     sdm: 'SDM',
     keuangan: 'Keuangan',
-    operasional: 'Operasional'
+    operasional: 'Operasional',
+    it: 'IT'
   };
   const divLabel = divisionLabels[currentUser.division] || '';
   sidebarName.textContent = toTitleCase(currentUser.display_name) + (divLabel ? ` (${divLabel})` : '');
@@ -1477,7 +1488,8 @@ function renderDocumentsTable() {
     marketing: 'Marketing',
     sdm: 'SDM',
     keuangan: 'Keuangan',
-    operasional: 'Operasional'
+    operasional: 'Operasional',
+    it: 'IT'
   };
   const divLabel = divisionLabels[currentUser.division] || '';
 
@@ -4114,7 +4126,7 @@ function renderMembersPanel() {
     li.className = 'member-item';
 
     const statusClass = member.is_online ? 'online' : 'offline';
-    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' };
+    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
     const divLabel = divisionLabels[member.division] || '';
     const creatorBadge = member.is_creator ? '<span class="creator-badge">Pembuat</span>' : '';
 
@@ -4201,7 +4213,7 @@ function renderAddMemberList() {
   available.forEach((user) => {
     const li = document.createElement('li');
     li.className = 'add-member-item';
-    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' };
+    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
     const divLabel = divisionLabels[user.division] || '';
 
     li.innerHTML = `

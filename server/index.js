@@ -50,6 +50,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/notion', require('./routes/notion'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

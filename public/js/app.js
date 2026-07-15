@@ -1,3 +1,9 @@
+/* ─── HELPERS ─── */
+function toTitleCase(str) {
+  if (!str) return str;
+  return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+}
+
 /* ─── STATE ─── */
 let token = localStorage.getItem('chat_token');
 let currentUser = JSON.parse(localStorage.getItem('chat_user') || 'null');
@@ -13,6 +19,29 @@ let typingTimer = null;
 let currentView = 'chat';
 let currentNotionPageId = null;
 let currentNotionPage = null;
+
+/* ─── SHARING FOLDER STATE ─── */
+let activeTab = 'masuk';
+let sharedDocuments = [];
+let projects = [];
+let recipientsList = [];
+let selectedUploadFile = null;
+let sharingCurrentPage = 1;
+const sharingPageSize = 10;
+
+/* ─── NOTION STATE ─── */
+let notionPages = [];
+let currentDbRows = [];
+let notionEditMode = false;
+let notionCalendarDate = new Date();
+let emojiPickerTarget = 'page';
+let activeDbView = 'table';
+let currentPeekRowId = null;
+let dbFilterText = '';
+let dbFilterStatus = '';
+let dbFilterPriority = '';
+let dbFilterAssignee = '';
+let notionCollapsedPages = {};
 
 const API = '';
 
@@ -212,6 +241,56 @@ if (isSidebarCollapsed) {
   if (appEl) appEl.classList.add('sidebar-collapsed');
 }
 
+// Restore sidebar width
+const savedWidth = localStorage.getItem('sidebar_width');
+if (savedWidth) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) sidebar.style.width = savedWidth + 'px';
+  });
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) sidebar.style.width = savedWidth + 'px';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+
+  // Create resizer element
+  const resizer = document.createElement('div');
+  resizer.className = 'sidebar-resizer';
+  resizer.id = 'sidebar-resizer';
+  sidebar.appendChild(resizer);
+
+  let isResizing = false;
+
+  resizer.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    document.body.style.cursor = 'col-resize';
+    sidebar.classList.add('resizing');
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const activityBar = document.querySelector('.activity-bar');
+    const activityBarWidth = activityBar ? activityBar.offsetWidth : 50;
+    let newWidth = e.clientX - activityBarWidth;
+    if (newWidth < 180) newWidth = 180;
+    if (newWidth > 450) newWidth = 450;
+    sidebar.style.width = newWidth + 'px';
+    localStorage.setItem('sidebar_width', newWidth);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      document.body.style.cursor = '';
+      sidebar.classList.remove('resizing');
+    }
+  });
+});
+
 /* ─── INIT ─── */
 if (token && currentUser) {
   showApp();
@@ -304,8 +383,14 @@ window.toggleSidebar = () => {
   const willCollapse = !appEl.classList.contains('sidebar-collapsed');
   appEl.classList.toggle('sidebar-collapsed', willCollapse);
   localStorage.setItem('sidebar_collapsed', willCollapse ? 'true' : 'false');
-  console.log('Sidebar toggled. Collapsed:', willCollapse);
 };
+
+// Wire up all hamburger sidebar-toggle buttons (collapse from sidebar header + expand from content headers)
+['btn-sidebar-collapse', 'empty-sidebar-toggle', 'chat-sidebar-toggle',
+  'sharing-sidebar-toggle', 'notion-sidebar-toggle', 'admin-sidebar-toggle'].forEach(id => {
+    const btn = $(id);
+    if (btn) btn.addEventListener('click', toggleSidebar);
+  });
 
 function switchSidebarTab(tabName, autoExpand = true) {
   // Update active state in UI
@@ -318,11 +403,13 @@ function switchSidebarTab(tabName, autoExpand = true) {
   const notionSection = document.querySelector('.notion-section');
   const roomsSection = document.querySelector('.rooms-section');
   const usersSection = document.querySelector('.users-section');
+  const adminSection = document.querySelector('.admin-section');
 
   if (menuSection) menuSection.classList.toggle('hidden', tabName !== 'files');
   if (notionSection) notionSection.classList.toggle('hidden', tabName !== 'notion');
   if (roomsSection) roomsSection.classList.toggle('hidden', tabName !== 'chat');
   if (usersSection) usersSection.classList.toggle('hidden', tabName !== 'chat');
+  if (adminSection) adminSection.classList.toggle('hidden', tabName !== 'admin');
 
   // Handle auto expansion of collapsed sidebar
   if (autoExpand) {
@@ -343,6 +430,8 @@ function switchSidebarTab(tabName, autoExpand = true) {
     }
   } else if (tabName === 'chat' && currentView !== 'chat') {
     switchView('chat');
+  } else if (tabName === 'admin' && currentView !== 'admin') {
+    switchView('admin');
   }
 }
 window.switchSidebarTab = switchSidebarTab;
@@ -351,7 +440,9 @@ window.switchSidebarTab = switchSidebarTab;
 if ($('toggle-rooms-btn')) {
   $('toggle-rooms-btn').addEventListener('click', (e) => {
     if (e.target.id === 'btn-new-room') return;
-    const isHidden = $('room-list').classList.toggle('hidden');
+    const roomList = $('room-list');
+    if (!roomList) return;
+    const isHidden = roomList.classList.toggle('hidden');
     const arrow = $('toggle-rooms-btn').querySelector('.toggle-arrow');
     if (arrow) {
       arrow.textContent = isHidden ? '▸' : '▾';
@@ -361,7 +452,9 @@ if ($('toggle-rooms-btn')) {
 
 if ($('toggle-users-btn')) {
   $('toggle-users-btn').addEventListener('click', () => {
-    const isHidden = $('user-list').classList.toggle('hidden');
+    const userList = $('user-list');
+    if (!userList) return;
+    const isHidden = userList.classList.toggle('hidden');
     const arrow = $('toggle-users-btn').querySelector('.toggle-arrow');
     if (arrow) {
       arrow.textContent = isHidden ? '▸' : '▾';
@@ -384,8 +477,12 @@ if ($('side-peek-backdrop')) {
 }
 
 /* ─── MODAL: NEW ROOM ─── */
-$('btn-new-room').addEventListener('click', () => modalOverlay.classList.remove('hidden'));
-$('modal-close').addEventListener('click', () => modalOverlay.classList.add('hidden'));
+if ($('btn-new-room')) {
+  $('btn-new-room').addEventListener('click', () => modalOverlay.classList.remove('hidden'));
+}
+if ($('modal-close')) {
+  $('modal-close').addEventListener('click', () => modalOverlay.classList.add('hidden'));
+}
 
 $('btn-create-room').addEventListener('click', async () => {
   const name = $('new-room-name').value.trim();
@@ -403,28 +500,32 @@ $('btn-create-room').addEventListener('click', async () => {
 });
 
 /* ─── SEND MESSAGE ─── */
-$('btn-send').addEventListener('click', sendMessage);
+if ($('btn-send')) {
+  $('btn-send').addEventListener('click', sendMessage);
+}
 
-messageInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-});
+if (messageInput) {
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 
-messageInput.addEventListener('input', () => {
-  // Auto-resize
-  messageInput.style.height = 'auto';
-  messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + 'px';
+  messageInput.addEventListener('input', () => {
+    // Auto-resize
+    messageInput.style.height = 'auto';
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + 'px';
 
-  // Typing indicator
-  if (!currentRoomId) return;
-  socket.emit('typing', { room_id: currentRoomId, is_typing: true });
-  clearTimeout(typingTimer);
-  typingTimer = setTimeout(() => {
-    socket.emit('typing', { room_id: currentRoomId, is_typing: false });
-  }, 2000);
-});
+    // Typing indicator
+    if (!currentRoomId) return;
+    socket.emit('typing', { room_id: currentRoomId, is_typing: true });
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      socket.emit('typing', { room_id: currentRoomId, is_typing: false });
+    }, 2000);
+  });
+}
 
 function sendMessage() {
   const content = messageInput.value.trim();
@@ -494,6 +595,40 @@ function connectSocket() {
     if (el) el.closest('.msg-group')?.remove();
   });
 
+  // Member panel real-time events
+  socket.on('member_added', ({ room_id, user }) => {
+    // Update cached room member_count
+    const room = rooms.find(r => r.id === room_id);
+    if (room) room.member_count = (room.member_count || 0) + 1;
+    // Live-refresh panel if currently viewing this room
+    if (room_id === currentRoomId) {
+      loadRoomMembers(room_id);
+      const memberCount = room ? room.member_count : '?';
+      chatMembersCount.textContent = `${memberCount} anggota`;
+    }
+  });
+
+  socket.on('member_removed', ({ room_id, user_id }) => {
+    const room = rooms.find(r => r.id === room_id);
+    if (room && room.member_count > 0) room.member_count -= 1;
+    if (room_id === currentRoomId) {
+      loadRoomMembers(room_id);
+      const memberCount = room ? room.member_count : '?';
+      chatMembersCount.textContent = `${memberCount} anggota`;
+    }
+  });
+
+  socket.on('removed_from_room', ({ room_id }) => {
+    // Remove room from local list and redirect to empty state
+    rooms = rooms.filter(r => r.id !== room_id);
+    renderRooms();
+    if (currentRoomId === room_id) {
+      currentRoomId = null;
+      chatView.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+    }
+  });
+
   socket.on('connect_error', (err) => {
     console.error('Socket error:', err.message);
   });
@@ -508,7 +643,9 @@ async function loadRooms() {
 }
 
 function renderRooms() {
-  roomList.innerHTML = '';
+  const roomListEl = $('room-list');
+  if (!roomListEl) return;
+  roomListEl.innerHTML = '';
   const groupRooms = rooms.filter(r => r.type === 'group');
   groupRooms.forEach((room) => {
     const li = document.createElement('li');
@@ -522,7 +659,7 @@ function renderRooms() {
       </div>
     `;
     li.addEventListener('click', () => openRoom(room));
-    roomList.appendChild(li);
+    roomListEl.appendChild(li);
   });
 }
 
@@ -559,19 +696,22 @@ function renderUsers() {
       : '<span class="status-dot offline"></span>';
 
     const dmRoom = rooms.find(r => r.type === 'dm' && r.dm_user_id === user.id);
-    const lastMsg = dmRoom ? dmRoom.last_message : 'Klik untuk chat';
+    const hasChat = dmRoom && dmRoom.last_message;
+    const subText = hasChat ? dmRoom.last_message : (user.jabatan || user.role || '');
 
     li.innerHTML = `
       <div class="user-avatar-container">
         <div class="avatar-circle-sm">${user.display_name.slice(0, 2).toUpperCase()}</div>
         ${statusDot}
       </div>
-      <div class="room-info" style="margin-left: 8px;">
-        <div class="room-name-container" style="display: flex; justify-content: space-between; align-items: center;">
-          <span class="room-name" style="flex: 1; font-weight: 500; font-size: 13px;">${esc(user.display_name)}</span>
-          <span class="division-badge ${user.division || ''}">${esc(divLabel)}</span>
+      <div class="room-info" style="margin-left: 8px; min-width: 0; flex: 1;">
+        <div class="room-name-container" style="display: flex; align-items: center;">
+          <span class="room-name" style="font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;" title="${esc(toTitleCase(user.display_name))}">${esc(toTitleCase(user.display_name))}</span>
         </div>
-        <div class="room-preview">${esc(lastMsg)}</div>
+        <div class="room-preview-row" style="display: flex; align-items: center; gap: 6px; margin-top: 2px; min-width: 0;">
+          <span class="division-badge ${user.division || ''}" style="font-size: 9px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; line-height: 1.2;" title="Divisi: ${esc(divLabel)}">${esc(divLabel)}</span>
+          <span class="room-preview" style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; flex: 1;" title="${esc(subText)}">${esc(subText)}</span>
+        </div>
       </div>
     `;
 
@@ -606,19 +746,29 @@ async function openRoom(room) {
     el.classList.toggle('active', el.dataset.roomId === room.id);
   });
 
+  // Show/hide members toggle button based on room type
+  const btnToggleMembers = $('btn-toggle-members');
+  if (btnToggleMembers) {
+    btnToggleMembers.classList.toggle('hidden', room.type === 'dm');
+  }
+
   // Update active state in Users list
   if (room.type === 'dm') {
     document.querySelectorAll('#user-list .room-item').forEach((el) => {
       el.classList.toggle('active', el.dataset.userId === room.dm_user_id);
     });
-    chatRoomName.textContent = room.dm_user_display_name || 'Direct Message';
+    chatRoomName.textContent = toTitleCase(room.dm_user_display_name) || 'Direct Message';
     chatMembersCount.textContent = room.dm_user_is_online ? 'Online' : 'Offline';
+    // Hide members panel for DMs
+    const membersPanel = $('members-panel');
+    if (membersPanel) membersPanel.classList.add('hidden');
   } else {
     document.querySelectorAll('#user-list .room-item').forEach((el) => {
       el.classList.remove('active');
     });
     chatRoomName.textContent = '#' + room.name;
-    chatMembersCount.textContent = 'Memuat pesan...';
+    const memberCount = room.member_count || '...';
+    chatMembersCount.textContent = `${memberCount} anggota`;
   }
 
   emptyState.classList.add('hidden');
@@ -630,7 +780,8 @@ async function openRoom(room) {
   if (!messages) return;
 
   if (room.type !== 'dm') {
-    chatMembersCount.textContent = `${messages.length} pesan terakhir`;
+    const memberCount = room.member_count || '?';
+    chatMembersCount.textContent = `${memberCount} anggota`;
   }
 
   let lastDate = null;
@@ -679,7 +830,7 @@ function appendMessage(msg) {
     <div class="avatar-circle">${initials}</div>
     <div class="msg-content">
       <div class="msg-meta">
-        <span class="msg-sender">${isOwn ? 'Kamu' : esc(msg.display_name)}</span>
+        <span class="msg-sender">${isOwn ? 'Kamu' : esc(toTitleCase(msg.display_name))}</span>
         <span class="msg-time">${time}</span>
       </div>
       <div class="msg-bubble" data-msg-id="${msg.id}">${esc(msg.content)}</div>
@@ -757,6 +908,13 @@ async function showApp() {
   authScreen.classList.add('hidden');
   app.classList.remove('hidden');
 
+  // Toggle Admin tab & section based on admin privilege
+  const tabBtnAdmin = $('tab-btn-admin');
+  const isAdmin = currentUser && (currentUser.is_admin === true || currentUser.role === 'admin');
+  if (tabBtnAdmin) {
+    tabBtnAdmin.classList.toggle('hidden', !isAdmin);
+  }
+
   const divisionLabels = {
     marketing: 'Marketing',
     sdm: 'SDM',
@@ -764,7 +922,7 @@ async function showApp() {
     operasional: 'Operasional'
   };
   const divLabel = divisionLabels[currentUser.division] || '';
-  sidebarName.textContent = currentUser.display_name + (divLabel ? ` (${divLabel})` : '');
+  sidebarName.textContent = toTitleCase(currentUser.display_name) + (divLabel ? ` (${divLabel})` : '');
 
   connectSocket();
   await loadRooms();
@@ -777,17 +935,17 @@ async function showApp() {
 function showAuth() {
   app.classList.add('hidden');
   authScreen.classList.remove('hidden');
+  const tabBtnAdmin = $('tab-btn-admin');
+  if (tabBtnAdmin) {
+    tabBtnAdmin.classList.add('hidden');
+  }
+  const adminSection = document.querySelector('.admin-section');
+  if (adminSection) {
+    adminSection.classList.add('hidden');
+  }
 }
 
-/* ─── SHARING FOLDER STATE & CONTROLLERS ─── */
-let activeTab = 'masuk';
-let sharedDocuments = [];
-let projects = [];
-let recipientsList = [];
-let selectedUploadFile = null;
-let sharingCurrentPage = 1;
-const sharingPageSize = 10;
-
+/* ─── SHARING FOLDER CONTROLLERS ─── */
 function switchView(viewName) {
   currentView = viewName;
 
@@ -796,6 +954,7 @@ function switchView(viewName) {
   $('empty-state').classList.add('hidden');
   $('sharing-folder-view').classList.add('hidden');
   if ($('notion-workspace-view')) $('notion-workspace-view').classList.add('hidden');
+  if ($('admin-panel-view')) $('admin-panel-view').classList.add('hidden');
 
   // Deactivate active sidebar items
   $('btn-sharing-folder').classList.remove('active');
@@ -841,13 +1000,13 @@ function switchView(viewName) {
       if (notionHeader) notionHeader.classList.remove('hidden');
 
       // Set Combined Calendar header info
-      const titleInput = $('notion-page-title');
+      const titleInput = $('notion-title-input');
       if (titleInput) {
         titleInput.value = 'Kalender Gabungan';
         titleInput.readOnly = true;
       }
 
-      const emojiEl = $('notion-emoji-icon');
+      const emojiEl = $('notion-page-icon');
       if (emojiEl) emojiEl.textContent = '📅';
 
       const coverEl = $('notion-cover');
@@ -856,9 +1015,9 @@ function switchView(viewName) {
       const coverActions = document.querySelector('.notion-cover-actions');
       if (coverActions) coverActions.classList.add('hidden');
 
-      const editBtn = $('btn-notion-edit-toggle');
+      const editBtn = $('btn-notion-edit');
       if (editBtn) editBtn.classList.add('hidden');
-      const cancelBtn = $('btn-notion-edit-cancel');
+      const cancelBtn = $('btn-notion-cancel');
       if (cancelBtn) cancelBtn.classList.add('hidden');
       const deleteBtn = $('btn-notion-delete');
       if (deleteBtn) deleteBtn.classList.add('hidden');
@@ -870,6 +1029,12 @@ function switchView(viewName) {
       if (breadcrumbs) breadcrumbs.innerHTML = '<span class="notion-breadcrumb-item">Kalender Gabungan</span>';
 
       renderNotionCalendar();
+    }
+  } else if (viewName === 'admin') {
+    currentRoomId = null;
+    if ($('admin-panel-view')) {
+      $('admin-panel-view').classList.remove('hidden');
+      loadAdminUsers();
     }
   }
 
@@ -894,6 +1059,11 @@ function switchView(viewName) {
     if (activeTabBtn && !activeTabBtn.classList.contains('active')) {
       switchSidebarTab('notion', false);
     }
+  } else if (viewName === 'admin') {
+    const activeTabBtn = document.querySelector('#tab-btn-admin');
+    if (activeTabBtn && !activeTabBtn.classList.contains('active')) {
+      switchSidebarTab('admin', false);
+    }
   }
 }
 
@@ -903,20 +1073,25 @@ function initSharingEvents() {
     switchView('sharing');
   });
 
-  // Handle selectable pills change
+  // Handle selectable pills change + update penerima counter
   document.addEventListener('change', (e) => {
     if (e.target && e.target.type === 'checkbox') {
       const pill = e.target.closest('.recipient-pill');
       if (pill) {
         pill.classList.toggle('selected', e.target.checked);
       }
+      // Update counter in document modals
+      const penerimaWrapper = e.target.closest('.penerima-wrapper');
+      if (penerimaWrapper) {
+        updatePenerimaCounter(penerimaWrapper);
+      }
     }
   });
 
-  // Tab click
-  document.querySelectorAll('.sharing-tab-btn').forEach(btn => {
+  // Tab click — works for both old .sharing-tab-btn and new .sf-tab
+  document.querySelectorAll('.sf-tab, .sharing-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.sharing-tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.sf-tab, .sharing-tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeTab = btn.dataset.tab;
       sharingCurrentPage = 1;
@@ -924,23 +1099,33 @@ function initSharingEvents() {
     });
   });
 
-  // Search & Filter change
-  $('sharing-search').addEventListener('input', () => {
-    sharingCurrentPage = 1;
-    renderDocumentsTable();
-  });
-  $('filter-month').addEventListener('change', () => {
-    sharingCurrentPage = 1;
-    renderDocumentsTable();
-  });
-  $('filter-year').addEventListener('change', () => {
-    sharingCurrentPage = 1;
-    renderDocumentsTable();
-  });
+  // Search & Filter change (elements optional — may be removed in newer HTML)
+  if ($('sharing-search')) {
+    $('sharing-search').addEventListener('input', () => {
+      sharingCurrentPage = 1;
+      renderDocumentsTable();
+    });
+  }
+  if ($('filter-month')) {
+    $('filter-month').addEventListener('change', () => {
+      sharingCurrentPage = 1;
+      renderDocumentsTable();
+    });
+  }
+  if ($('filter-year')) {
+    $('filter-year').addEventListener('change', () => {
+      sharingCurrentPage = 1;
+      renderDocumentsTable();
+    });
+  }
 
   // Close modals
-  $('modal-upload-close').addEventListener('click', () => $('modal-upload-overlay').classList.add('hidden'));
-  $('modal-edit-close').addEventListener('click', () => $('modal-edit-overlay').classList.add('hidden'));
+  if ($('modal-upload-close')) {
+    $('modal-upload-close').addEventListener('click', () => $('modal-upload-overlay').classList.add('hidden'));
+  }
+  if ($('modal-edit-close')) {
+    $('modal-edit-close').addEventListener('click', () => $('modal-edit-overlay').classList.add('hidden'));
+  }
 
   // Trigger Upload modal
   $('btn-upload-doc').addEventListener('click', () => {
@@ -956,14 +1141,7 @@ function initSharingEvents() {
     const day = String(now.getDate()).padStart(2, '0');
     $('upload-doc-date').value = `${year}-${month}-${day}`;
 
-    // Hide or show 'Kontrak' based on role
-    const selectType = $('upload-doc-type');
-    const kontrakOpt = selectType.querySelector('option[value="Kontrak"]');
-    if (currentUser.role === 'staff') {
-      if (kontrakOpt) kontrakOpt.style.display = 'none';
-    } else {
-      if (kontrakOpt) kontrakOpt.style.display = '';
-    }
+    populateDocTypes('upload-doc-type');
 
     renderRecipientSelectors();
     $('modal-upload-overlay').classList.remove('hidden');
@@ -981,16 +1159,19 @@ function initSharingFolder() {
   renderSharingTabs();
 
   // Set default active tab based on role
-  document.querySelectorAll('.sharing-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.sf-tab, .sharing-tab-btn').forEach(btn => btn.classList.remove('active'));
   if (currentUser.role === 'top management') {
     activeTab = 'semua';
-    $('tab-semua-btn').classList.add('active');
+    const semuaBtn = $('tab-semua-btn');
+    if (semuaBtn) { semuaBtn.classList.remove('hidden'); semuaBtn.classList.add('active'); }
   } else if (currentUser.role === 'management') {
     activeTab = 'divisi';
-    $('tab-divisi-btn').classList.add('active');
+    const divisiBtn = $('tab-divisi-btn');
+    if (divisiBtn) { divisiBtn.classList.remove('hidden'); divisiBtn.classList.add('active'); }
   } else {
     activeTab = 'masuk';
-    document.querySelector('.sharing-tab-btn[data-tab="masuk"]').classList.add('active');
+    const masukBtn = document.querySelector('.sf-tab[data-tab="masuk"], .sharing-tab-btn[data-tab="masuk"]');
+    if (masukBtn) masukBtn.classList.add('active');
   }
 
   updateSharingCounts();
@@ -1026,18 +1207,79 @@ async function updateSharingCounts() {
   }
 }
 
+const DOC_TYPES_BY_DIVISION = {
+  marketing: ['PO (Purchase Order)', 'FPTK', 'SPK', 'SPH', 'LOI', 'MRA', 'LOA', 'BQ', 'Kontrak'],
+  sdm: ['Penempatan', 'Sewa Tenaga', 'Rekap Cuti Pelaksana', 'Rekap Lembur', 'PKWT', 'BPJS', 'Database Manpower'],
+  keuangan: ['Invoice', 'Faktur Pajak'],
+  operasional: [''],
+  default: ['Lain-lain', 'Memo Internal']
+};
+
+function populateDocTypes(selectId, selectedValue = '') {
+  const selectEl = $(selectId);
+  if (!selectEl) return;
+
+  const divName = (currentUser.division || '').toLowerCase();
+  let options = DOC_TYPES_BY_DIVISION[divName] || DOC_TYPES_BY_DIVISION['default'];
+
+  if (divName && DOC_TYPES_BY_DIVISION['default']) {
+    options = [...options, ...DOC_TYPES_BY_DIVISION['default']];
+  }
+  options = [...new Set(options)];
+
+  // Apply role restriction: Staff cannot see 'Kontrak'
+  if (currentUser.role === 'staff') {
+    options = options.filter(opt => opt !== 'Kontrak');
+  }
+
+  if (selectedValue && !options.includes(selectedValue)) {
+    options.push(selectedValue);
+  }
+
+  let html = '<option value="" disabled selected>Pilih Tipe</option>';
+  options.forEach(opt => {
+    // Determine the actual value. If it's PO (Purchase Order), keep PO as value?
+    // Wait, previously PO was value="PO". Let's match previous values.
+    let val = opt;
+    if (opt === 'PO (Purchase Order)') val = 'PO';
+    html += `<option value="${esc(val)}" ${val === selectedValue ? 'selected' : ''}>${esc(opt)}</option>`;
+  });
+  selectEl.innerHTML = html;
+}
+
+// TomSelect replaced with Select2
+
 async function loadSharingProjects() {
   const data = await apiFetch('/api/documents/projects');
-  if (data) {
-    projects = data;
-    const upProj = $('upload-project-name');
-    const editProj = $('edit-project-name');
+  if (!data) return;
+  projects = data;
 
-    const placeholder = '<option value="" disabled selected>Pilih Proyek</option>';
-    const options = data.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+  const placeholder = '<option value="" disabled selected>Pilih Proyek</option>';
+  const options = data.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
 
+  const upProj = $('upload-project-name');
+  const editProj = $('edit-project-name');
+
+  if (upProj) {
     upProj.innerHTML = placeholder + options;
+    if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+      jQuery('#upload-project-name').select2({
+        dropdownParent: jQuery('#modal-upload-overlay'),
+        placeholder: 'Pilih Proyek...',
+        width: '100%'
+      });
+    }
+  }
+
+  if (editProj) {
     editProj.innerHTML = placeholder + options;
+    if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+      jQuery('#edit-project-name').select2({
+        dropdownParent: jQuery('#modal-edit-overlay'),
+        placeholder: 'Pilih Proyek...',
+        width: '100%'
+      });
+    }
   }
 }
 
@@ -1048,6 +1290,127 @@ async function loadSharingRecipients() {
   }
 }
 
+function updatePenerimaCounter(container) {
+  const wrapper = container.closest('.penerima-wrapper') || container.querySelector('.penerima-wrapper');
+  if (!wrapper) return;
+  const counterEl = wrapper.querySelector('.penerima-counter');
+  if (!counterEl) return;
+  const checked = wrapper.querySelectorAll('input[type="checkbox"]:checked').length;
+  if (checked === 0) {
+    counterEl.textContent = 'Belum dipilih';
+    counterEl.style.color = 'var(--text-muted)';
+    counterEl.style.background = 'transparent';
+  } else {
+    counterEl.textContent = `${checked} penerima dipilih`;
+    counterEl.style.color = 'var(--accent)';
+    counterEl.style.background = '';
+  }
+}
+
+function renderPenerimaWidget(container) {
+  // Derive unique divisions and jabatan from the loaded recipients list
+  const allUsers = recipientsList.filter(u => u.username !== currentUser.username);
+
+  const divisions = [...new Set(
+    allUsers.map(u => u.divisi).filter(Boolean)
+  )].sort();
+
+  const jabatanList = [...new Set(
+    allUsers.map(u => u.jabatan).filter(Boolean)
+  )].sort();
+
+  // Build the penerima widget HTML structure
+  let html = '<div class="penerima-wrapper">';
+
+  html += `
+    <div class="penerima-toolbar">
+      <input type="text" class="penerima-search" placeholder="Cari divisi atau jabatan..." data-penerima-search="true" />
+      <span class="penerima-counter">Belum dipilih</span>
+    </div>
+    <div class="penerima-body">
+      <div class="penerima-group" data-group="divisi">
+        <div class="penerima-group-header">
+          <span class="penerima-group-label">Divisi</span>
+          <button type="button" class="penerima-select-all" data-select-all="divisi">Pilih Semua</button>
+        </div>
+        <div class="penerima-items">
+          ${divisions.length > 0
+      ? divisions.map(div => `
+              <label class="recipient-pill">
+                <input type="checkbox" name="recipients-division" value="${esc(div)}"> ${esc(div)}
+              </label>
+            `).join('')
+      : '<div class="penerima-empty" style="display:block;">Tidak ada divisi tersedia</div>'
+    }
+        </div>
+      </div>
+      <div class="penerima-group" data-group="jabatan">
+        <div class="penerima-group-header">
+          <span class="penerima-group-label">Jabatan</span>
+          <button type="button" class="penerima-select-all" data-select-all="jabatan">Pilih Semua</button>
+        </div>
+        <div class="penerima-items">
+          ${jabatanList.length > 0
+      ? jabatanList.map(jab => `
+              <label class="recipient-pill">
+                <input type="checkbox" name="recipients-jabatan" value="${esc(jab)}"> ${esc(jab)}
+              </label>
+            `).join('')
+      : '<div class="penerima-empty" style="display:block;">Tidak ada jabatan tersedia</div>'
+    }
+        </div>
+      </div>
+    </div>
+  `;
+
+  html += '</div>'; // .penerima-wrapper
+  container.innerHTML = html;
+
+  // ── Attach search filtering ──
+  const searchInput = container.querySelector('.penerima-search');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      const q = this.value.toLowerCase().trim();
+      const wrapper = this.closest('.penerima-wrapper');
+      wrapper.querySelectorAll('.penerima-group').forEach(group => {
+        let hasVisible = false;
+        group.querySelectorAll('.recipient-pill, .recipient-item').forEach(item => {
+          const text = item.textContent.toLowerCase();
+          const match = !q || text.includes(q);
+          item.style.display = match ? '' : 'none';
+          if (match) hasVisible = true;
+        });
+        // Also show/hide the group header
+        const header = group.querySelector('.penerima-group-header');
+        const itemsContainer = group.querySelector('.penerima-items');
+        if (header) header.style.display = hasVisible ? '' : 'none';
+      });
+    });
+  }
+
+  // ── Attach select-all per group ──
+  container.querySelectorAll('.penerima-select-all').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const group = this.closest('.penerima-group');
+      if (!group) return;
+      const checkboxes = group.querySelectorAll('input[type="checkbox"]');
+      const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+      checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+        // Update pill visual
+        const pill = cb.closest('.recipient-pill');
+        if (pill) pill.classList.toggle('selected', cb.checked);
+      });
+      // Update button text
+      this.textContent = allChecked ? 'Pilih Semua' : 'Hapus Semua';
+      updatePenerimaCounter(container);
+    });
+  });
+
+  // ── Initial counter update ──
+  updatePenerimaCounter(container);
+}
+
 function renderRecipientSelectors() {
   const upContainer = $('upload-recipient-container');
   const editContainer = $('edit-recipient-container');
@@ -1055,59 +1418,8 @@ function renderRecipientSelectors() {
   upContainer.innerHTML = '';
   editContainer.innerHTML = '';
 
-  if (currentUser.role === 'staff') {
-    // Staff sends to divisions and roles
-    const divisions = ['Marketing', 'SDM', 'Keuangan', 'Operasional'];
-    const roles = ['Staff', 'SM', 'Direktur Umum', 'Wakil Direktur'];
-
-    const getHtml = () => `
-      <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; letter-spacing: 0.05em;">DIVISI</div>
-      <div class="recipient-pill-container" style="margin-bottom: 12px;">
-        ${divisions.map(div => `
-          <label class="recipient-pill">
-            <input type="checkbox" name="recipients-division" value="Divisi ${div}"> Divisi ${div}
-          </label>
-        `).join('')}
-      </div>
-      <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; letter-spacing: 0.05em;">JABATAN / ROLE</div>
-      <div class="recipient-pill-container">
-        ${roles.map(role => `
-          <label class="recipient-pill">
-            <input type="checkbox" name="recipients-role" value="${role}"> ${role}
-          </label>
-        `).join('')}
-      </div>
-    `;
-
-    upContainer.innerHTML = getHtml();
-    editContainer.innerHTML = getHtml();
-  } else {
-    // Management/Top Management sends to specific users
-    const filtered = recipientsList.filter(user => {
-      if (currentUser.role === 'management') {
-        return user.role === 'management' || user.role === 'top management';
-      }
-      return true;
-    });
-
-    const userCheckboxes = filtered
-      .filter(user => user.username !== currentUser.username)
-      .map(user => `
-        <label class="recipient-item">
-          <input type="checkbox" name="recipients-user" value="${esc(user.name)}"> ${esc(user.name)} (${user.jabatan})
-        </label>
-      `).join('');
-
-    const getHtml = () => `
-      <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; letter-spacing: 0.05em;">PENGGUNA</div>
-      <div class="recipient-grid" style="max-height: 120px;">
-        ${userCheckboxes || '<span style="font-size: 12px; color: var(--text-muted);">Tidak ada pengguna lain</span>'}
-      </div>
-    `;
-
-    upContainer.innerHTML = getHtml();
-    editContainer.innerHTML = getHtml();
-  }
+  renderPenerimaWidget(upContainer);
+  renderPenerimaWidget(editContainer);
 }
 
 async function loadSharedDocuments() {
@@ -1121,15 +1433,25 @@ async function loadSharedDocuments() {
 function getDisplayRecipients(penerimaStr) {
   const recs = (penerimaStr || '').split(',').map(r => r.trim()).filter(Boolean);
 
+  // Derive division and jabatan values from recipientsList for dynamic matching
+  const knownDivisions = [...new Set(recipientsList.map(u => u.divisi).filter(Boolean))];
+  const knownJabatan = [...new Set(recipientsList.map(u => u.jabatan).filter(Boolean))];
+
   const isGroupLabel = (str) => {
-    return str.startsWith('Divisi ') ||
-      str.startsWith('SM ') ||
-      str.startsWith('Staff ') ||
-      str === 'Direktur Umum' ||
-      str === 'Wakil Direktur' ||
-      str === 'Direktur' ||
-      str === 'Semua SM' ||
-      str === 'Semua Staff';
+    // New format: "Divisi X", "Jabatan X", "JabatanName DivisionName"
+    if (str.startsWith('Divisi ')) return true;
+    if (str.startsWith('Jabatan ')) return true;
+    // Legacy formats
+    if (str.startsWith('SM ') || str.startsWith('Senior Manager ') || str.startsWith('Staff ')) return true;
+    if (str === 'Direktur Umum' || str === 'Wakil Direktur' || str === 'Wakil Direktur Utama' || str === 'Direktur') return true;
+    if (str === 'Semua SM' || str === 'Semua Senior Manager' || str === 'Semua Staff') return true;
+    // Dynamic: "JabatanName DivisionName" combos
+    for (const jab of knownJabatan) {
+      for (const div of knownDivisions) {
+        if (str === `${jab} ${div}`) return true;
+      }
+    }
+    return false;
   };
 
   const groupLabels = recs.filter(isGroupLabel);
@@ -1141,13 +1463,15 @@ function getDisplayRecipients(penerimaStr) {
 
 function renderDocumentsTable() {
   const tbody = $('sharing-table-body');
-  const emptyDiv = $('sharing-empty');
-  const paginationDiv = $('sharing-pagination');
+  const emptyDiv = $('sharing-empty') || null;
+  const paginationDiv = $('sharing-pagination') || null;
+  if (!tbody) return;
+
   tbody.innerHTML = '';
 
-  const searchVal = $('sharing-search').value.toLowerCase().trim();
-  const filterMonth = $('filter-month').value;
-  const filterYear = $('filter-year').value;
+  const searchVal = $('sharing-search') ? $('sharing-search').value.toLowerCase().trim() : '';
+  const filterMonth = $('filter-month') ? $('filter-month').value : '';
+  const filterYear = $('filter-year') ? $('filter-year').value : '';
 
   const divisionLabels = {
     marketing: 'Marketing',
@@ -1160,12 +1484,59 @@ function renderDocumentsTable() {
   const filtered = sharedDocuments.filter(doc => {
     // 1. Tab Filter
     if (activeTab === 'keluar') {
-      if (doc.senderName !== currentUser.display_name) return false;
+      // Staff: only show their own sent documents
+      // Management (SM): show documents from their division
+      // Top Management: show all documents (handled by "semua" tab)
+      const senderLower = (doc.senderName || '').toLowerCase().trim();
+      const currentNameLower = (currentUser.display_name || '').toLowerCase().trim();
+      const isOwnDoc = senderLower === currentNameLower;
+      const isManagement = currentUser.role === 'management';
+      const isTopManagement = currentUser.role === 'top management';
+
+      if (isTopManagement) {
+        // Top management sees all in "semua" tab, not "keluar"
+        return false;
+      }
+
+      if (isManagement) {
+        // Management sees their own docs + docs from their division
+        const senderDiv = doc.senderDivision;
+        const sameDivision = senderDiv && senderDiv.toLowerCase() === (currentUser.division || '').toLowerCase();
+        if (!isOwnDoc && !sameDivision) return false;
+      } else {
+        // Staff only sees their own docs
+        if (!isOwnDoc) return false;
+      }
     } else if (activeTab === 'masuk') {
-      if (doc.senderName === currentUser.display_name) return false;
+      const senderLower = (doc.senderName || '').toLowerCase().trim();
+      const currentNameLower = (currentUser.display_name || '').toLowerCase().trim();
+      if (senderLower === currentNameLower) return false;
       const recs = (doc.penerima || '').split(',').map(r => r.trim());
-      const isRecipient = recs.includes(currentUser.display_name) ||
-        recs.includes(`Divisi ${divLabel}`);
+
+      // Build the full list of group labels the current user belongs to
+      const userGroups = [currentUser.display_name];
+      const mappedDiv = divisionLabels[currentUser.division] || '';
+      if (mappedDiv) {
+        userGroups.push('Divisi ' + mappedDiv);
+        const jbt = currentUser.jabatan || 'Staff';
+        userGroups.push(jbt + ' ' + mappedDiv);
+      }
+      const jbt = currentUser.jabatan || 'Staff';
+      if (jbt === 'Direktur Umum') {
+        userGroups.push('Direktur Umum');
+      } else if (jbt === 'Wakil Direktur' || jbt === 'Wakil Direktur Utama') {
+        userGroups.push('Wakil Direktur');
+        userGroups.push('Wakil Direktur Utama');
+      } else if (jbt === 'Direktur') {
+        userGroups.push('Direktur');
+      } else if (jbt === 'SM' || jbt === 'Senior Manager') {
+        userGroups.push('Semua SM');
+        userGroups.push('Semua Senior Manager');
+      } else if (jbt === 'Staff') {
+        userGroups.push('Semua Staff');
+      }
+
+      const isRecipient = userGroups.some(g => recs.includes(g));
       if (!isRecipient) return false;
     } else if (activeTab === 'divisi') {
       // For SM, backend already filtered to their division list.
@@ -1186,12 +1557,13 @@ function renderDocumentsTable() {
 
     // 3. Month Filter
     const docDate = new Date(doc.tgl);
-    if (filterMonth !== '') {
-      if (docDate.getMonth() !== parseInt(filterMonth, 10)) return false;
+    if (filterMonth !== '' && filterMonth !== 'all') {
+      // getMonth() is 0-based; filter values are 1-based
+      if (docDate.getMonth() + 1 !== parseInt(filterMonth, 10)) return false;
     }
 
     // 4. Year Filter
-    if (filterYear !== '') {
+    if (filterYear !== '' && filterYear !== 'all') {
       if (docDate.getFullYear() !== parseInt(filterYear, 10)) return false;
     }
 
@@ -1199,11 +1571,11 @@ function renderDocumentsTable() {
   });
 
   if (filtered.length === 0) {
-    emptyDiv.classList.remove('hidden');
+    if (emptyDiv) emptyDiv.classList.remove('hidden');
     if (paginationDiv) paginationDiv.classList.add('hidden');
     return;
   }
-  emptyDiv.classList.add('hidden');
+  if (emptyDiv) emptyDiv.classList.add('hidden');
 
   // Calculate Pagination parameters
   const totalPages = Math.ceil(filtered.length / sharingPageSize) || 1;
@@ -1213,13 +1585,11 @@ function renderDocumentsTable() {
   // Render pagination controls
   if (paginationDiv) {
     paginationDiv.classList.remove('hidden');
-    const pageInfo = $('sharing-page-info');
-    if (pageInfo) pageInfo.textContent = `Halaman ${sharingCurrentPage} dari ${totalPages}`;
-
-    const prevBtn = $('btn-sharing-prev');
-    const nextBtn = $('btn-sharing-next');
-    if (prevBtn) prevBtn.disabled = (sharingCurrentPage === 1);
-    if (nextBtn) nextBtn.disabled = (sharingCurrentPage === totalPages);
+    paginationDiv.innerHTML = `
+      <button class="btn-secondary-sm" id="btn-sharing-prev" onclick="changeSharingPage(-1)" ${sharingCurrentPage === 1 ? 'disabled' : ''}>← Prev</button>
+      <span id="sharing-page-info" style="font-size:13px; color:var(--text-secondary);">Halaman ${sharingCurrentPage} dari ${totalPages}</span>
+      <button class="btn-secondary-sm" id="btn-sharing-next" onclick="changeSharingPage(1)" ${sharingCurrentPage === totalPages ? 'disabled' : ''}>Next →</button>
+    `;
   }
 
   // Get current page items
@@ -1229,46 +1599,58 @@ function renderDocumentsTable() {
   pageItems.forEach(doc => {
     const tr = document.createElement('tr');
 
-    const dateStr = new Date(doc.tgl).toLocaleString('id-ID', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
+    const d = new Date(doc.tgl);
+    const dateDay = d.toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    const dateTime = d.toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
     const senderDivLabel = divisionLabels[doc.senderDivision] || doc.senderDivision || '';
-    const senderStr = `${esc(doc.senderName)}<span class="doc-sub">${esc(senderDivLabel)}</span>`;
 
-    const typeBadge = `<span class="badge-type ${doc.document_type.toLowerCase()}">${esc(doc.document_type)}</span>` +
-      (doc.sub_tipe ? `<span class="doc-sub">${esc(doc.sub_tipe)}</span>` : '');
-
-    const nameStr = `<span class="doc-title">${esc(doc.document_name)}</span>` +
-      `<span class="doc-sub" style="font-family: var(--font-mono);">${esc(doc.document_number)}</span>`;
+    const typeBadge = `<span class="badge-type ${doc.document_type.toLowerCase()}">${esc(doc.document_type)}</span>`;
+    const subTipe = doc.sub_tipe ? `<span class="doc-sub">${esc(doc.sub_tipe)}</span>` : '';
 
     const displayRecs = getDisplayRecipients(doc.penerima);
     const recipientsStr = displayRecs.map(r => {
       const tagClass = getTagClassForRecipient(r);
-      return `<span class="tag-pill ${tagClass}" style="margin: 2px;">${esc(r)}</span>`;
-    }).join(' ');
+      return `<span class="tag-pill ${tagClass}">${esc(r)}</span>`;
+    }).join('');
 
-    const canEdit = doc.senderName === currentUser.display_name;
+    const canEdit = (doc.senderName || '').toLowerCase().trim() === (currentUser.display_name || '').toLowerCase().trim();
     const editBtn = canEdit
-      ? `<button class="btn-action edit-btn" onclick="event.stopPropagation(); openEditModal('${doc.id}')">Ubah</button>`
+      ? `<button class="btn-action edit-btn" onclick="event.stopPropagation(); openEditModal('${doc.id}')">
+           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+           Ubah
+         </button>`
       : '';
 
     tr.style.cursor = 'pointer';
-    tr.addEventListener('click', () => {
-      openDetailModal(doc.id);
-    });
+    tr.addEventListener('click', () => openDetailModal(doc.id));
 
     tr.innerHTML = `
-      <td style="white-space: nowrap;">${dateStr}</td>
-      <td>${senderStr}</td>
-      <td>${typeBadge}</td>
-      <td>${nameStr}</td>
-      <td style="max-width: 200px;">${recipientsStr}</td>
-      <td>
-        <div class="action-btn-group">
-          <button class="btn-action view-btn" onclick="event.stopPropagation(); openDetailModal('${doc.id}')">Detail</button>
-          ${editBtn}
+      <td class="sf-td-date">
+        <div class="sf-date-day">${dateDay}</div>
+        <div class="sf-date-time">${dateTime}</div>
+      </td>
+      <td class="sf-td-doc">
+        <div class="sf-doc-name">${esc(doc.document_name)}</div>
+        <div class="sf-doc-meta">
+          ${typeBadge}${subTipe}
+          <span class="doc-sub sf-doc-number">${esc(doc.document_number)}</span>
+          ${doc.project_name ? `<span class="doc-sub">${esc(doc.project_name)}</span>` : ''}
         </div>
+      </td>
+      <td class="sf-td-sender">
+        <div class="sf-sender-name">${esc(toTitleCase(doc.senderName))}</div>
+        ${senderDivLabel ? `<div class="sf-sender-div">${esc(senderDivLabel)}</div>` : ''}
+      </td>
+      <td class="sf-td-recipients">
+        <div class="sf-recipients-wrap">${recipientsStr}</div>
+      </td>
+      <td class="sf-td-actions">
+        <button class="btn-action view-btn" onclick="event.stopPropagation(); openDetailModal('${doc.id}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Detail
+        </button>
+        ${editBtn}
       </td>
     `;
 
@@ -1338,132 +1720,64 @@ function resolveRecipientSelections(containerId) {
   const container = $(containerId);
   if (!container) return [];
 
+  const selectedDivs = [];
+  container.querySelectorAll('input[name="recipients-division"]:checked').forEach(cb => {
+    selectedDivs.push(cb.value.trim()); // e.g. 'Marketing'
+  });
+
+  const selectedJabatan = [];
+  container.querySelectorAll('input[name="recipients-jabatan"]:checked').forEach(cb => {
+    selectedJabatan.push(cb.value.trim()); // e.g. 'SM'
+  });
+
+  if (selectedDivs.length === 0 && selectedJabatan.length === 0) {
+    return null;
+  }
+
   const resolvedRecipients = [];
-  if (currentUser.role === 'staff') {
-    const selectedDivs = [];
-    container.querySelectorAll('input[name="recipients-division"]:checked').forEach(cb => {
-      selectedDivs.push(cb.value.replace('Divisi ', '').trim()); // e.g. 'Marketing'
-    });
 
-    const selectedRoles = [];
-    container.querySelectorAll('input[name="recipients-role"]:checked').forEach(cb => {
-      selectedRoles.push(cb.value.trim()); // e.g. 'SM'
-    });
-
-    if (selectedDivs.length === 0 && selectedRoles.length === 0) {
-      return null;
-    }
-
-    // Now, resolve based on checked options:
-    if (selectedDivs.length > 0 && selectedRoles.length > 0) {
-      // Both divisions and roles selected
-      selectedDivs.forEach(divName => {
-        selectedRoles.forEach(roleName => {
-          let groupLabel = '';
-          if (roleName === 'Direktur Umum') {
-            groupLabel = 'Direktur Umum';
-          } else if (roleName === 'Wakil Direktur') {
-            groupLabel = 'Wakil Direktur';
-          } else if (roleName === 'Direktur') {
-            groupLabel = 'Direktur';
-          } else {
-            groupLabel = `${roleName} ${divName}`;
-          }
-
-          if (!resolvedRecipients.includes(groupLabel)) {
-            resolvedRecipients.push(groupLabel);
-          }
-
-          // Add individual users in this division with this role
-          const matchingUsers = recipientsList.filter(u => {
-            const matchDiv = (u.divisi || '').toLowerCase() === divName.toLowerCase();
-            const matchRole = (u.jabatan || '').toLowerCase() === roleName.toLowerCase() ||
-              ((roleName === 'Direktur Umum' || roleName === 'Wakil Direktur' || roleName === 'Direktur') && u.role === 'top management');
-            return matchDiv && matchRole;
-          });
-
-          matchingUsers.forEach(u => {
-            if (!resolvedRecipients.includes(u.name)) {
-              resolvedRecipients.push(u.name);
-            }
-          });
-        });
-      });
-
-      // Special case: if top management is selected, ensure all Top Management are added as individuals too
-      if (selectedRoles.includes('Direktur Umum') || selectedRoles.includes('Wakil Direktur') || selectedRoles.includes('Direktur')) {
-        const direkturs = recipientsList.filter(u => u.role === 'top management' || u.jabatan === 'Direktur Umum' || u.jabatan === 'Wakil Direktur' || u.jabatan === 'Direktur');
-        direkturs.forEach(u => {
-          if (!resolvedRecipients.includes(u.name)) {
-            resolvedRecipients.push(u.name);
-          }
-        });
-      }
-    } else if (selectedDivs.length > 0) {
-      // Only divisions selected (sends to entire division)
-      selectedDivs.forEach(divName => {
-        const groupLabel = `Divisi ${divName}`;
+  if (selectedDivs.length > 0 && selectedJabatan.length > 0) {
+    // Both divisions and jabatan selected — add group labels for each combination
+    selectedDivs.forEach(divName => {
+      selectedJabatan.forEach(jabName => {
+        const groupLabel = `${jabName} ${divName}`;
         if (!resolvedRecipients.includes(groupLabel)) {
           resolvedRecipients.push(groupLabel);
         }
-
-        const matchingUsers = recipientsList.filter(u => (u.divisi || '').toLowerCase() === divName.toLowerCase());
-        matchingUsers.forEach(u => {
-          if (!resolvedRecipients.includes(u.name)) {
-            resolvedRecipients.push(u.name);
-          }
+        // Expand to individual users matching both
+        recipientsList.filter(u =>
+          (u.divisi || '').toLowerCase() === divName.toLowerCase() &&
+          (u.jabatan || '').toLowerCase() === jabName.toLowerCase() &&
+          u.username !== currentUser.username
+        ).forEach(u => {
+          if (!resolvedRecipients.includes(u.name)) resolvedRecipients.push(u.name);
         });
       });
-    } else if (selectedRoles.length > 0) {
-      // Only roles selected (sends to this role in all divisions)
-      selectedRoles.forEach(roleName => {
-        let groupLabel = '';
-        if (roleName === 'Direktur Umum') {
-          groupLabel = 'Direktur Umum';
-        } else if (roleName === 'Wakil Direktur') {
-          groupLabel = 'Wakil Direktur';
-        } else if (roleName === 'Direktur') {
-          groupLabel = 'Direktur';
-        } else if (roleName === 'SM') {
-          groupLabel = 'Semua SM';
-        } else {
-          groupLabel = 'Semua Staff';
-        }
-
-        if (!resolvedRecipients.includes(groupLabel)) {
-          resolvedRecipients.push(groupLabel);
-        }
-
-        const matchingUsers = recipientsList.filter(u => {
-          if (roleName === 'Direktur Umum') {
-            return u.jabatan === 'Direktur Umum' || (u.role === 'top management' && u.jabatan === 'Direktur Umum');
-          } else if (roleName === 'Wakil Direktur') {
-            return u.jabatan === 'Wakil Direktur' || (u.role === 'top management' && u.jabatan === 'Wakil Direktur');
-          } else if (roleName === 'Direktur') {
-            return u.role === 'top management' || u.jabatan === 'Direktur';
-          } else if (roleName === 'SM') {
-            return u.jabatan === 'SM';
-          } else {
-            return u.jabatan === 'Staff';
-          }
-        });
-
-        matchingUsers.forEach(u => {
-          if (!resolvedRecipients.includes(u.name)) {
-            resolvedRecipients.push(u.name);
-          }
-        });
+    });
+  } else if (selectedDivs.length > 0) {
+    // Only divisions — entire division
+    selectedDivs.forEach(divName => {
+      const groupLabel = `Divisi ${divName}`;
+      if (!resolvedRecipients.includes(groupLabel)) resolvedRecipients.push(groupLabel);
+      recipientsList.filter(u =>
+        (u.divisi || '').toLowerCase() === divName.toLowerCase() &&
+        u.username !== currentUser.username
+      ).forEach(u => {
+        if (!resolvedRecipients.includes(u.name)) resolvedRecipients.push(u.name);
       });
-    }
+    });
   } else {
-    // Management/Top Management
-    container.querySelectorAll('input[name="recipients-user"]:checked').forEach(cb => {
-      resolvedRecipients.push(cb.value);
+    // Only jabatan — this jabatan across all divisions
+    selectedJabatan.forEach(jabName => {
+      const groupLabel = `Jabatan ${jabName}`;
+      if (!resolvedRecipients.includes(groupLabel)) resolvedRecipients.push(groupLabel);
+      recipientsList.filter(u =>
+        (u.jabatan || '').toLowerCase() === jabName.toLowerCase() &&
+        u.username !== currentUser.username
+      ).forEach(u => {
+        if (!resolvedRecipients.includes(u.name)) resolvedRecipients.push(u.name);
+      });
     });
-
-    if (resolvedRecipients.length === 0) {
-      return null;
-    }
   }
 
   return resolvedRecipients;
@@ -1567,9 +1881,14 @@ function openEditModal(docId) {
   if (!doc) return;
 
   $('edit-doc-id').value = doc.id;
-  $('edit-doc-type').value = doc.document_type;
+  populateDocTypes('edit-doc-type', doc.document_type);
   $('edit-sub-tipe').value = doc.sub_tipe || '';
-  $('edit-project-name').value = doc.project_name;
+
+  if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+    jQuery('#edit-project-name').val(doc.project_name).trigger('change');
+  } else {
+    $('edit-project-name').value = doc.project_name;
+  }
   $('edit-doc-number').value = doc.document_number;
   $('edit-doc-name').value = doc.document_name;
   $('edit-description').value = doc.description || '';
@@ -1584,57 +1903,45 @@ function openEditModal(docId) {
     $('edit-doc-date').value = '';
   }
 
-  const container = $('edit-recipient-container');
   renderRecipientSelectors();
 
-  const recs = (doc.penerima || '').split(',').map(r => r.trim());
+  const container = $('edit-recipient-container');
+  const recs = (doc.penerima || '').split(',').map(r => r.trim()).filter(Boolean);
 
-  if (currentUser.role === 'staff') {
-    // Check divisions
-    const divisions = ['Marketing', 'SDM', 'Keuangan', 'Operasional'];
-    divisions.forEach(div => {
-      const checkbox = container.querySelector(`input[name="recipients-division"][value="Divisi ${div}"]`);
-      if (checkbox) {
-        const isDivChecked = recs.includes(`Divisi ${div}`) ||
-          recs.includes(`SM ${div}`) ||
-          recs.includes(`Staff ${div}`);
-        if (isDivChecked) {
-          checkbox.checked = true;
-          checkbox.closest('.recipient-pill')?.classList.add('selected');
-        }
-      }
+  // Restore division checkboxes: a division is checked if any saved recipient
+  // is "Divisi X", "JabatanX X", or "X Y" where X matches the division name
+  container.querySelectorAll('input[name="recipients-division"]').forEach(cb => {
+    const divName = cb.value.trim().toLowerCase();
+    const isChecked = recs.some(r => {
+      const lower = r.toLowerCase();
+      return lower === `divisi ${divName}` ||
+        lower.endsWith(` ${divName}`) ||
+        lower === divName;
     });
+    if (isChecked) {
+      cb.checked = true;
+      cb.closest('.recipient-pill')?.classList.add('selected');
+    }
+  });
 
-    // Check roles
-    const roles = ['Staff', 'SM', 'Direktur Umum', 'Wakil Direktur'];
-    roles.forEach(role => {
-      const checkbox = container.querySelector(`input[name="recipients-role"][value="${role}"]`);
-      if (checkbox) {
-        let isRoleChecked = false;
-        if (role === 'Direktur Umum') {
-          isRoleChecked = recs.includes('Direktur Umum');
-        } else if (role === 'Wakil Direktur') {
-          isRoleChecked = recs.includes('Wakil Direktur');
-        } else if (role === 'SM') {
-          isRoleChecked = recs.includes('Semua SM') || recs.some(r => r.startsWith('SM '));
-        } else if (role === 'Staff') {
-          isRoleChecked = recs.includes('Semua Staff') || recs.some(r => r.startsWith('Staff '));
-        }
+  // Restore jabatan checkboxes: a jabatan is checked if any saved recipient
+  // is "Jabatan X", "X DivName", or matches directly
+  container.querySelectorAll('input[name="recipients-jabatan"]').forEach(cb => {
+    const jabName = cb.value.trim().toLowerCase();
+    const isChecked = recs.some(r => {
+      const lower = r.toLowerCase();
+      return lower === `jabatan ${jabName}` ||
+        lower.startsWith(`${jabName} `) ||
+        lower === jabName;
+    });
+    if (isChecked) {
+      cb.checked = true;
+      cb.closest('.recipient-pill')?.classList.add('selected');
+    }
+  });
 
-        if (isRoleChecked) {
-          checkbox.checked = true;
-          checkbox.closest('.recipient-pill')?.classList.add('selected');
-        }
-      }
-    });
-  } else {
-    recs.forEach(rec => {
-      const checkbox = container.querySelector(`input[name="recipients-user"][value="${rec}"]`);
-      if (checkbox) {
-        checkbox.checked = true;
-      }
-    });
-  }
+  // Update penerima counter
+  updatePenerimaCounter(container);
 
   $('modal-edit-overlay').classList.remove('hidden');
 }
@@ -1725,24 +2032,47 @@ function openDetailModal(docId) {
   `;
   previewContainer.appendChild(actionCard);
 
+  // Log view event (fire-and-forget, ignore errors)
+  apiFetch(`/api/documents/${doc.id}/view`, { method: 'POST' }).catch(() => { });
+
+  // Fetch and render view history
+  const viewsList = $('peek-views-list');
+  if (viewsList) {
+    viewsList.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Memuat...</div>';
+    apiFetch(`/api/documents/${doc.id}/views`).then(views => {
+      if (!views || !Array.isArray(views) || views.length === 0) {
+        viewsList.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Belum ada riwayat.</div>';
+        return;
+      }
+      viewsList.innerHTML = views.map(v => {
+        const when = new Date(v.viewed_at).toLocaleString('id-ID', {
+          day: 'numeric', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+        const jabDiv = [v.viewer_jabatan, v.viewer_division ? (
+          { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' }[v.viewer_division] || v.viewer_division
+        ) : null].filter(Boolean).join(' · ');
+        return `
+          <div style="display:flex; align-items:flex-start; gap:8px; padding:6px 8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+            <div style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:var(--accent-glow); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--accent);">
+              ${esc(toTitleCase(v.viewer_name || '?').slice(0, 2).toUpperCase())}
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:12px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(toTitleCase(v.viewer_name))}</div>
+              ${jabDiv ? `<div style="font-size:11px; color:var(--text-muted);">${esc(jabDiv)}</div>` : ''}
+              <div style="font-size:11px; color:var(--text-muted); margin-top:1px;">${when}</div>
+            </div>
+          </div>`;
+      }).join('');
+    });
+  }
+
   $('side-peek-backdrop').classList.remove('hidden');
   $('side-peek-panel').classList.add('open');
 }
 window.openDetailModal = openDetailModal;
 
-/* ─── NOTION WORKSPACE STATE ─── */
-let notionPages = [];
-let currentDbRows = [];
-let notionEditMode = false;
-let notionCalendarDate = new Date();
-let emojiPickerTarget = 'page'; // 'page' or 'peek'
-let activeDbView = 'table';
-let currentPeekRowId = null;
-let dbFilterText = '';
-let dbFilterStatus = '';
-let dbFilterPriority = '';
-let dbFilterAssignee = '';
-let notionCollapsedPages = {};
+/* ─── NOTION WORKSPACE CONTROLLERS ─── (state moved to top) */
 let notionIsCollapsed = false;
 
 /* ─── NOTION WORKSPACE CONTROLLERS ─── */
@@ -1917,22 +2247,25 @@ async function createNewNotionPage(event) {
 window.createNewNotionPage = createNewNotionPage;
 
 async function addSubpageToCurrent() {
-  if (!currentNotionPageId) return;
-  const title = await showCustomPrompt("Masukkan judul sub-halaman baru:");
+  const isSubpage = !!currentNotionPageId;
+  const promptMsg = isSubpage
+    ? "Masukkan judul sub-halaman baru:"
+    : "Masukkan judul halaman baru:";
+  const title = await showCustomPrompt(promptMsg);
   if (title === null) return;
   const pageTitle = title.trim() || "Tanpa Judul";
 
-  const isDb = await showCustomConfirm("Apakah Anda ingin membuat sub-halaman ini sebagai Database?\n\n(Klik 'OK' untuk membuat Database, 'Batal' untuk membuat Wiki/Catatan biasa)");
+  const isDb = await showCustomConfirm("Apakah Anda ingin membuat halaman ini sebagai Database?\n\n(Klik 'OK' untuk Database, 'Batal' untuk Wiki/Catatan biasa)");
 
   try {
     const pageData = {
       title: pageTitle,
-      content: isDb ? "Database sub-halaman baru." : "# " + pageTitle + "\n\nTulis sesuatu di sini...",
+      content: isDb ? "Database baru." : "# " + pageTitle + "\n\nTulis sesuatu di sini...",
       icon: isDb ? "📅" : "📄",
       cover_image: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-      parent_id: currentNotionPageId,
+      parent_id: isSubpage ? currentNotionPageId : null,
       is_database: isDb,
-      database_view: isDb ? "table" : "table",
+      database_view: "table",
       properties: {}
     };
 
@@ -1942,12 +2275,16 @@ async function addSubpageToCurrent() {
     });
 
     if (newPage) {
-      delete notionCollapsedPages[currentNotionPageId];
+      if (isSubpage) delete notionCollapsedPages[currentNotionPageId];
       await loadNotionWorkspace();
-      openNotionPage(currentNotionPageId);
+      if (isSubpage) {
+        openNotionPage(currentNotionPageId);
+      } else {
+        openNotionPage(newPage.id);
+      }
     }
   } catch (err) {
-    console.error("Gagal membuat sub-halaman Notion:", err);
+    console.error("Gagal membuat halaman Notion:", err);
   }
 }
 window.addSubpageToCurrent = addSubpageToCurrent;
@@ -1977,27 +2314,53 @@ async function openNotionPage(pageId) {
     }
   }
 
-  // Render Emoji
-  const emojiEl = $('notion-emoji-icon');
+  // Render Emoji / icon
+  const emojiEl = $('notion-page-icon');
   if (emojiEl) {
     emojiEl.textContent = currentNotionPage.icon || (currentNotionPage.is_database ? '📅' : '📄');
+  }
+
+  // Render Title display — show display div, hide input
+  const titleDisplay = $('notion-title-display');
+  if (titleDisplay) {
+    titleDisplay.textContent = currentNotionPage.title || 'Untitled';
+    titleDisplay.classList.remove('hidden');
+    titleDisplay.style.cursor = 'pointer';
+    // Wire click-to-edit (replace handler each open)
+    titleDisplay.onclick = () => {
+      const inp = $('notion-title-input');
+      if (!inp) return;
+      inp.value = titleDisplay.textContent;
+      titleDisplay.classList.add('hidden');
+      inp.classList.remove('hidden');
+      inp.focus();
+      inp.select();
+    };
+  }
+
+  const titleInput = $('notion-title-input');
+  if (titleInput) {
+    titleInput.value = currentNotionPage.title || '';
+    titleInput.classList.add('hidden');
+    titleInput.onblur = () => saveNotionTitle();
+    titleInput.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); saveNotionTitle(); }
+      if (e.key === 'Escape') {
+        titleInput.classList.add('hidden');
+        const disp = $('notion-title-display');
+        if (disp) disp.classList.remove('hidden');
+      }
+    };
   }
 
   // Render Title Breadcrumbs
   renderBreadcrumbs();
 
-  // Set Title Input
-  const titleInput = $('notion-page-title');
-  if (titleInput) {
-    titleInput.value = currentNotionPage.title || '';
-    titleInput.readOnly = false;
-  }
-
   // Restore action controls for standard pages
   const coverActions = document.querySelector('.notion-cover-actions');
   if (coverActions) coverActions.classList.remove('hidden');
 
-  const editBtn = $('btn-notion-edit-toggle');
+  const editBtn = $('btn-notion-edit');
   if (editBtn) editBtn.classList.remove('hidden');
   const deleteBtn = $('btn-notion-delete');
   if (deleteBtn) deleteBtn.classList.remove('hidden');
@@ -2024,12 +2387,12 @@ async function openNotionPage(pageId) {
     $('notion-page-content-area').classList.remove('hidden');
     $('notion-database-content-area').classList.add('hidden');
 
-    const editBtn = $('btn-notion-edit-toggle');
-    if (editBtn) editBtn.textContent = 'Ubah';
+    const editBtn = $('btn-notion-edit');
+    if (editBtn) editBtn.textContent = 'Edit';
     $('notion-editor-wrapper').classList.add('hidden');
-    $('notion-preview-area').classList.remove('hidden');
+    $('notion-viewer').classList.remove('hidden');
 
-    const textarea = $('notion-editor-textarea');
+    const textarea = $('notion-editor');
     if (textarea) textarea.value = currentNotionPage.content || '';
 
     renderMarkdownPreview();
@@ -2039,8 +2402,8 @@ async function openNotionPage(pageId) {
     $('notion-database-content-area').classList.remove('hidden');
 
     activeDbView = currentNotionPage.database_view || 'table';
-    document.querySelectorAll('.notion-db-tab-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.view === activeDbView);
+    document.querySelectorAll('.notion-db-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === activeDbView.toLowerCase());
     });
 
     renderDatabaseView();
@@ -2232,7 +2595,7 @@ function parseMarkdownInline(text) {
 window.parseMarkdownInline = parseMarkdownInline;
 
 function renderMarkdownPreview() {
-  const previewArea = $('notion-preview-area');
+  const previewArea = $('notion-rendered-content');
   if (!previewArea || !currentNotionPage) return;
 
   previewArea.innerHTML = parseMarkdown(currentNotionPage.content);
@@ -2252,7 +2615,7 @@ function renderMarkdownPreview() {
 
         currentNotionPage.content = lines.join('\n');
 
-        const textarea = $('notion-editor-textarea');
+        const textarea = $('notion-editor');
         if (textarea) textarea.value = currentNotionPage.content;
 
         await apiFetch(`/api/notion/pages/${currentNotionPageId}`, {
@@ -2270,10 +2633,10 @@ window.renderMarkdownPreview = renderMarkdownPreview;
 async function toggleNotionEditMode() {
   if (!currentNotionPageId) return;
 
-  const editBtn = $('btn-notion-edit-toggle');
-  const cancelBtn = $('btn-notion-edit-cancel');
-  const textarea = $('notion-editor-textarea');
-  const previewBlock = $('notion-preview-area');
+  const editBtn = $('btn-notion-edit');
+  const cancelBtn = $('btn-notion-cancel');
+  const textarea = $('notion-editor');
+  const previewBlock = $('notion-viewer');
   const editorWrapper = $('notion-editor-wrapper');
 
   if (!notionEditMode) {
@@ -2283,15 +2646,15 @@ async function toggleNotionEditMode() {
     editorWrapper.classList.remove('hidden');
     previewBlock.classList.add('hidden');
     renderNotionPageAccess();
-    textarea.focus();
+    if (textarea) textarea.focus();
   } else {
     notionEditMode = false;
-    editBtn.textContent = 'Ubah';
+    editBtn.textContent = 'Edit';
     if (cancelBtn) cancelBtn.classList.add('hidden');
     editorWrapper.classList.add('hidden');
     previewBlock.classList.remove('hidden');
 
-    const updatedContent = textarea.value;
+    const updatedContent = textarea ? textarea.value : '';
     currentNotionPage.content = updatedContent;
 
     const canEditAccess = true;
@@ -2332,13 +2695,13 @@ function cancelNotionEdit() {
 
   notionEditMode = false;
 
-  const editBtn = $('btn-notion-edit-toggle');
-  const cancelBtn = $('btn-notion-edit-cancel');
-  const textarea = $('notion-editor-textarea');
-  const previewBlock = $('notion-preview-area');
+  const editBtn = $('btn-notion-edit');
+  const cancelBtn = $('btn-notion-cancel');
+  const textarea = $('notion-editor');
+  const previewBlock = $('notion-viewer');
   const editorWrapper = $('notion-editor-wrapper');
 
-  if (editBtn) editBtn.textContent = 'Ubah';
+  if (editBtn) editBtn.textContent = 'Edit';
   if (cancelBtn) cancelBtn.classList.add('hidden');
   if (editorWrapper) editorWrapper.classList.add('hidden');
   if (previewBlock) previewBlock.classList.remove('hidden');
@@ -2352,11 +2715,17 @@ window.cancelNotionEdit = cancelNotionEdit;
 async function saveNotionTitle() {
   if (!currentNotionPageId) return;
 
-  const titleInput = $('notion-page-title');
+  const titleInput = $('notion-title-input');
   if (!titleInput) return;
 
   const newTitle = titleInput.value.trim() || 'Tanpa Judul';
-  if (newTitle === currentNotionPage.title) return;
+  if (newTitle === currentNotionPage.title) {
+    // No change — just restore display
+    const titleDisplay = $('notion-title-display');
+    if (titleDisplay) titleDisplay.classList.remove('hidden');
+    titleInput.classList.add('hidden');
+    return;
+  }
 
   currentNotionPage.title = newTitle;
 
@@ -2365,9 +2734,20 @@ async function saveNotionTitle() {
     body: { title: newTitle }
   });
 
+  const titleDisplay = $('notion-title-display');
+
   if (updatedPage) {
+    if (titleDisplay) {
+      titleDisplay.textContent = newTitle;
+      titleDisplay.classList.remove('hidden');
+    }
+    if (titleInput) titleInput.classList.add('hidden');
     await loadNotionWorkspace();
     renderBreadcrumbs();
+  } else {
+    // Revert on failure
+    if (titleDisplay) titleDisplay.classList.remove('hidden');
+    if (titleInput) titleInput.classList.add('hidden');
   }
 }
 window.saveNotionTitle = saveNotionTitle;
@@ -2612,7 +2992,7 @@ async function selectEmoji(emoji) {
     if (!currentNotionPageId) return;
 
     currentNotionPage.icon = emoji;
-    const emojiEl = $('notion-emoji-icon');
+    const emojiEl = $('notion-page-icon');
     if (emojiEl) emojiEl.textContent = emoji;
 
     const updatedPage = await apiFetch(`/api/notion/pages/${currentNotionPageId}`, {
@@ -2625,14 +3005,14 @@ async function selectEmoji(emoji) {
       renderBreadcrumbs();
     }
   } else if (emojiPickerTarget === 'peek') {
-    const peekEmojiEl = $('notion-peek-emoji');
+    const peekEmojiEl = $('notion-peek-icon');
     if (peekEmojiEl) peekEmojiEl.textContent = emoji;
   }
 }
 window.selectEmoji = selectEmoji;
 
 function insertEditorTag(tag) {
-  const textarea = $('notion-editor-textarea');
+  const textarea = $('notion-editor');
   if (!textarea) return;
 
   const start = textarea.selectionStart;
@@ -2688,8 +3068,8 @@ async function switchDbView(viewName) {
   if (!currentNotionPageId) return;
 
   activeDbView = viewName;
-  document.querySelectorAll('.notion-db-tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === viewName);
+  document.querySelectorAll('.notion-db-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === viewName.toLowerCase());
   });
 
   await apiFetch(`/api/notion/pages/${currentNotionPageId}`, {
@@ -2705,6 +3085,10 @@ async function switchDbView(viewName) {
 window.switchDbView = switchDbView;
 
 function renderDatabaseView() {
+  // Clear container before rendering to prevent content accumulation
+  const dbContainer = $('notion-db-content');
+  if (dbContainer) dbContainer.innerHTML = '';
+
   let filteredRows = currentDbRows.filter(row => {
     const props = typeof row.properties === 'string' ? JSON.parse(row.properties) : (row.properties || {});
 
@@ -2747,7 +3131,7 @@ function renderDatabaseView() {
 window.renderDatabaseView = renderDatabaseView;
 
 function renderTable(rows) {
-  const container = $('notion-db-view-container');
+  const container = $('notion-db-content');
   if (!container) return;
 
   if (rows.length === 0) {
@@ -2887,7 +3271,7 @@ async function deleteDbRow(rowId) {
 window.deleteDbRow = deleteDbRow;
 
 function renderBoard(rows) {
-  const container = $('notion-db-view-container');
+  const container = $('notion-db-content');
   if (!container) return;
 
   container.innerHTML = '';
@@ -3010,7 +3394,7 @@ window.handleBoardCardDrop = handleBoardCardDrop;
 
 
 function renderCalendar(rows) {
-  const container = $('notion-db-view-container');
+  const container = $('notion-db-content');
   if (!container) return;
 
   container.innerHTML = '';
@@ -3039,6 +3423,8 @@ function renderCalendar(rows) {
 
   const grid = document.createElement('div');
   grid.className = 'notion-calendar-grid';
+  grid.style.marginTop = '12px';
+  grid.style.width = '100%';
 
   const daysOfWeek = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
   daysOfWeek.forEach(day => {
@@ -3114,7 +3500,7 @@ window.navigateDbCalendar = (dir) => {
 };
 
 function renderGallery(rows) {
-  const container = $('notion-db-view-container');
+  const container = $('notion-db-content');
   if (!container) return;
 
   if (rows.length === 0) {
@@ -3167,7 +3553,7 @@ function renderGallery(rows) {
 window.renderGallery = renderGallery;
 
 function renderList(rows) {
-  const container = $('notion-db-view-container');
+  const container = $('notion-db-content');
   if (!container) return;
 
   if (rows.length === 0) {
@@ -3219,7 +3605,7 @@ window.toggleListTaskStatus = async (rowId, currentStatus) => {
 };
 
 function renderTimeline(rows) {
-  const container = $('notion-db-view-container');
+  const container = $('notion-db-content');
   if (!container) return;
 
   if (rows.length === 0) {
@@ -3467,34 +3853,23 @@ window.addNewDatabaseRow = addNewDatabaseRow;
 
 function openNotionPeek(rowId) {
   currentPeekRowId = rowId;
-  const row = currentDbRows.find(r => r.id === rowId);
-  if (!row) {
-    // If not found in currentDbRows, maybe it's in flat notionPages (from Kalender Gabungan)
-    const pageRow = notionPages.find(r => r.id === rowId);
-    if (!pageRow) return;
 
-    const props = typeof pageRow.properties === 'string' ? JSON.parse(pageRow.properties) : (pageRow.properties || {});
-    $('notion-peek-emoji').textContent = pageRow.icon || '📄';
-    $('notion-peek-title').value = pageRow.title || '';
-    $('notion-peek-status').value = props.status || 'To Do';
-    $('notion-peek-priority').value = props.priority || 'Low';
-    $('notion-peek-assignee').value = props.assignee || '';
-    $('notion-peek-start-date').value = props.start_date || '';
-    $('notion-peek-deadline').value = props.deadline || '';
-    $('notion-peek-progress').value = props.progress !== undefined ? props.progress : 0;
-    $('notion-peek-content').value = pageRow.content || '';
-  } else {
-    const props = typeof row.properties === 'string' ? JSON.parse(row.properties) : (row.properties || {});
-    $('notion-peek-emoji').textContent = row.icon || '📄';
-    $('notion-peek-title').value = row.title || '';
-    $('notion-peek-status').value = props.status || 'To Do';
-    $('notion-peek-priority').value = props.priority || 'Low';
-    $('notion-peek-assignee').value = props.assignee || '';
-    $('notion-peek-start-date').value = props.start_date || '';
-    $('notion-peek-deadline').value = props.deadline || '';
-    $('notion-peek-progress').value = props.progress !== undefined ? props.progress : 0;
-    $('notion-peek-content').value = row.content || '';
-  }
+  const setVal = (id, val) => { const el = $(id); if (el) { if ('value' in el) el.value = val; else el.textContent = val; } };
+
+  const row = currentDbRows.find(r => r.id === rowId);
+  const dataRow = row || notionPages.find(r => r.id === rowId);
+  if (!dataRow) return;
+
+  const props = typeof dataRow.properties === 'string' ? JSON.parse(dataRow.properties) : (dataRow.properties || {});
+
+  setVal('notion-peek-icon', dataRow.icon || '📄');
+  setVal('notion-peek-title', dataRow.title || '');
+  setVal('notion-peek-status', props.status || 'To Do');
+  setVal('notion-peek-priority', props.priority || 'Low');
+  setVal('notion-peek-assignee', props.assignee || '');
+  setVal('notion-peek-duedate', props.deadline || props.due_date || '');
+  setVal('notion-peek-tags', (props.tags || []).join(', '));
+  setVal('notion-peek-description', dataRow.content || '');
 
   $('notion-peek-backdrop').classList.remove('hidden');
   $('notion-peek-panel').classList.add('open');
@@ -3511,32 +3886,22 @@ window.closeNotionPeek = closeNotionPeek;
 async function saveNotionPeek() {
   if (!currentPeekRowId) return;
 
-  const emoji = $('notion-peek-emoji').textContent;
-  const title = $('notion-peek-title').value.trim() || 'Tanpa Judul';
-  const status = $('notion-peek-status').value;
-  const priority = $('notion-peek-priority').value;
-  const assignee = $('notion-peek-assignee').value;
-  const startDate = $('notion-peek-start-date').value;
-  const deadline = $('notion-peek-deadline').value;
-  let progress = parseInt($('notion-peek-progress').value, 10);
-  if (isNaN(progress)) progress = 0;
-  if (progress < 0) progress = 0;
-  if (progress > 100) progress = 100;
-  const content = $('notion-peek-content').value;
+  const getVal = (id, fallback = '') => { const el = $(id); return el ? ('value' in el ? el.value : el.textContent) : fallback; };
 
-  const updatedProps = {
-    status,
-    priority,
-    assignee,
-    start_date: startDate,
-    deadline,
-    progress
-  };
+  const emoji = getVal('notion-peek-icon', '📄');
+  const title = getVal('notion-peek-title').trim() || 'Tanpa Judul';
+  const status = getVal('notion-peek-status', 'To Do');
+  const priority = getVal('notion-peek-priority', 'Low');
+  const assignee = getVal('notion-peek-assignee', '');
+  const deadline = getVal('notion-peek-duedate', '');
+  const tags = getVal('notion-peek-tags', '').split(',').map(t => t.trim()).filter(Boolean);
+  const content = getVal('notion-peek-description', '');
 
-  if (status === 'Done' && progress !== 100) {
+  const updatedProps = { status, priority, assignee, deadline, tags };
+
+  if (status === 'Done') {
     updatedProps.progress = 100;
   }
-
   try {
     const updatedRow = await apiFetch(`/api/notion/pages/${currentPeekRowId}`, {
       method: 'PUT',
@@ -3605,6 +3970,7 @@ function switchToNotionCalendar() {
   currentNotionPage = null;
   currentDbRows = [];
   switchView('notion-calendar');
+  renderNotionCalendar();
 }
 window.switchToNotionCalendar = switchToNotionCalendar;
 
@@ -3621,8 +3987,14 @@ function renderNotionCalendar() {
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
   ];
 
-  const monthTitle = $('notion-calendar-month-title');
+  const monthTitle = $('cal-month-year');
   if (monthTitle) monthTitle.textContent = `${monthNames[month]} ${year}`;
+
+  // Wire nav buttons (idempotent — safe to reassign each render)
+  const prevBtn = $('btn-cal-prev');
+  const nextBtn = $('btn-cal-next');
+  if (prevBtn) prevBtn.onclick = () => navigateNotionCalendar(-1);
+  if (nextBtn) nextBtn.onclick = () => navigateNotionCalendar(1);
 
   const daysOfWeek = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
   daysOfWeek.forEach(day => {
@@ -3703,10 +4075,480 @@ window.navigateNotionCalendar = (dir) => {
   }
   renderNotionCalendar();
 };
-
 async function openNotionPageAndPeek(parentDbId, rowId) {
   await openNotionPage(parentDbId);
   openNotionPeek(rowId);
 }
 window.openNotionPageAndPeek = openNotionPageAndPeek;
+
+/* ─── ROOM MEMBERS PANEL ─── */
+let currentRoomMembers = [];
+
+function toggleMembersPanel() {
+  const panel = $('members-panel');
+  if (!panel || !currentRoomId) return;
+  const isHidden = panel.classList.toggle('hidden');
+  if (!isHidden) {
+    loadRoomMembers(currentRoomId);
+  }
+}
+window.toggleMembersPanel = toggleMembersPanel;
+
+async function loadRoomMembers(roomId) {
+  const data = await apiFetch(`/api/rooms/${roomId}/members`);
+  if (!data) return;
+  currentRoomMembers = data;
+  renderMembersPanel();
+}
+
+function renderMembersPanel() {
+  const list = $('members-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  const currentRoom = rooms.find(r => r.id === currentRoomId);
+  const isCreator = currentRoom && currentRoom.created_by === currentUser.id;
+
+  currentRoomMembers.forEach((member) => {
+    const li = document.createElement('li');
+    li.className = 'member-item';
+
+    const statusClass = member.is_online ? 'online' : 'offline';
+    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' };
+    const divLabel = divisionLabels[member.division] || '';
+    const creatorBadge = member.is_creator ? '<span class="creator-badge">Pembuat</span>' : '';
+
+    let removeBtn = '';
+    if (isCreator && member.id !== currentUser.id) {
+      removeBtn = `<button class="btn-remove-member" onclick="removeMemberFromRoom('${member.id}')" title="Keluarkan">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>`;
+    } else if (member.id === currentUser.id) {
+      removeBtn = `<button class="btn-remove-member btn-leave" onclick="removeMemberFromRoom('${member.id}')" title="Keluar dari room">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </button>`;
+    }
+
+    li.innerHTML = `
+      <div class="member-avatar">
+        <div class="avatar-circle-sm">${esc(member.display_name.slice(0, 2).toUpperCase())}</div>
+        <span class="status-dot ${statusClass}"></span>
+      </div>
+      <div class="member-info">
+        <div class="member-name">${esc(toTitleCase(member.display_name))} ${creatorBadge}</div>
+        <div class="member-meta">${esc(divLabel)}${member.jabatan ? ' · ' + esc(member.jabatan) : ''}</div>
+      </div>
+      ${removeBtn}
+    `;
+    list.appendChild(li);
+  });
+}
+
+async function removeMemberFromRoom(userId) {
+  if (!currentRoomId) return;
+  const isSelf = userId === currentUser.id;
+  const msg = isSelf ? 'Yakin ingin keluar dari room ini?' : 'Yakin ingin mengeluarkan anggota ini?';
+  if (!confirm(msg)) return;
+
+  await apiFetch(`/api/rooms/${currentRoomId}/members/${userId}`, { method: 'DELETE' });
+}
+window.removeMemberFromRoom = removeMemberFromRoom;
+
+function openAddMemberModal() {
+  const modal = $('add-member-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  $('add-member-search').value = '';
+  renderAddMemberList();
+}
+window.openAddMemberModal = openAddMemberModal;
+
+function closeAddMemberModal() {
+  const modal = $('add-member-modal');
+  if (modal) modal.classList.add('hidden');
+}
+window.closeAddMemberModal = closeAddMemberModal;
+
+function filterAddMemberList() {
+  renderAddMemberList();
+}
+window.filterAddMemberList = filterAddMemberList;
+
+function renderAddMemberList() {
+  const list = $('add-member-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  const search = ($('add-member-search')?.value || '').toLowerCase();
+  const memberIds = currentRoomMembers.map(m => m.id);
+
+  const available = systemUsers.filter(u =>
+    !memberIds.includes(u.id) &&
+    (u.display_name.toLowerCase().includes(search) || u.username.toLowerCase().includes(search))
+  );
+
+  if (available.length === 0) {
+    list.innerHTML = '<li class="no-results">Tidak ada pengguna yang tersedia</li>';
+    return;
+  }
+
+  available.forEach((user) => {
+    const li = document.createElement('li');
+    li.className = 'add-member-item';
+    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' };
+    const divLabel = divisionLabels[user.division] || '';
+
+    li.innerHTML = `
+      <div class="member-avatar">
+        <div class="avatar-circle-sm">${esc(user.display_name.slice(0, 2).toUpperCase())}</div>
+      </div>
+      <div class="member-info">
+        <div class="member-name">${esc(toTitleCase(user.display_name))}</div>
+        <div class="member-meta">${esc(divLabel)}</div>
+      </div>
+      <button class="btn-add-member-confirm" onclick="addMemberToRoom('${user.id}')">Tambah</button>
+    `;
+    list.appendChild(li);
+  });
+}
+
+async function addMemberToRoom(userId) {
+  if (!currentRoomId) return;
+  const res = await apiFetch(`/api/rooms/${currentRoomId}/members`, {
+    method: 'POST',
+    body: { user_id: userId }
+  });
+  if (res) {
+    await loadRoomMembers(currentRoomId);
+    renderAddMemberList();
+    await loadRooms();
+  }
+}
+window.addMemberToRoom = addMemberToRoom;
+
+/* ─── ADMIN PANEL CONTROLLERS ─── */
+let adminUsersList = [];
+
+// Switch subview (currently only users)
+function switchAdminSubView(subView) {
+  document.querySelectorAll('.admin-section .room-item').forEach(el => {
+    el.classList.toggle('active', el.id === `btn-admin-${subView}`);
+  });
+}
+window.switchAdminSubView = switchAdminSubView;
+
+// Load all users
+async function loadAdminUsers() {
+  const users = await apiFetch('/api/admin/users');
+  if (users) {
+    adminUsersList = users;
+    renderAdminUsersTable(users);
+  }
+}
+window.loadAdminUsers = loadAdminUsers;
+
+// Render users table
+function renderAdminUsersTable(users) {
+  const tbody = $('admin-users-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+
+  if (users.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Tidak ada data pengguna.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  const divisionLabels = {
+    marketing: 'Marketing',
+    sdm: 'SDM',
+    keuangan: 'Keuangan',
+    operasional: 'Operasional'
+  };
+
+  users.forEach(user => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+
+    // division badge class
+    const divClass = user.division ? user.division.toLowerCase() : 'default';
+    const isSelf = user.id === currentUser.id;
+
+    tr.innerHTML = `
+      <td style="padding: 12px 16px; font-weight: 500; color: var(--text-primary);">${esc(toTitleCase(user.display_name))} ${isSelf ? ' <small style="color:var(--accent); font-weight:normal;">(Anda)</small>' : ''}</td>
+      <td style="padding: 12px 16px; color: var(--text-secondary);">${esc(user.username)}</td>
+      <td style="padding: 12px 16px; color: var(--text-secondary);">${esc(user.email)}</td>
+      <td style="padding: 12px 16px;">
+        <span class="division-badge ${divClass}">${esc(divisionLabels[user.division] || user.division || '-')}</span>
+      </td>
+      <td style="padding: 12px 16px; color: var(--text-secondary);">${esc(user.jabatan || '-')}</td>
+      <td style="padding: 12px 16px;">
+        <span class="role-badge role-${user.role === 'top management' ? 'top-management' : user.role}">${esc(user.role)}</span>
+      </td>
+      <td style="padding: 12px 16px; text-align: center;">
+        <span class="admin-badge ${user.is_admin ? 'yes' : 'no'}">${user.is_admin ? 'Ya' : 'Tidak'}</span>
+      </td>
+      <td style="padding: 12px 16px; text-align: center;">
+        <div style="display: flex; gap: 8px; justify-content: center;">
+          <button class="btn-primary-sm" style="padding: 4px 8px; font-size: 11px; background: var(--accent);" onclick="openAdminEditUserModal('${user.id}')">Edit</button>
+          <button class="btn-secondary-sm" style="padding: 4px 8px; font-size: 11px; background: #e67e22; color: white; border: none;" onclick="openAdminResetPwdModal('${user.id}')">Kunci</button>
+          <button class="btn-danger-sm" style="padding: 4px 8px; font-size: 11px; ${isSelf ? 'opacity: 0.5; cursor: not-allowed;' : ''}" ${isSelf ? 'disabled' : ''} onclick="deleteAdminUser('${user.id}')">Hapus</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Client-side search filter
+function filterAdminUsers() {
+  const query = $('admin-user-search').value.toLowerCase().trim();
+  if (!query) {
+    renderAdminUsersTable(adminUsersList);
+    return;
+  }
+
+  const filtered = adminUsersList.filter(user => {
+    return (user.display_name && user.display_name.toLowerCase().includes(query)) ||
+      (user.username && user.username.toLowerCase().includes(query)) ||
+      (user.email && user.email.toLowerCase().includes(query)) ||
+      (user.jabatan && user.jabatan.toLowerCase().includes(query)) ||
+      (user.role && user.role.toLowerCase().includes(query)) ||
+      (user.division && user.division.toLowerCase().includes(query));
+  });
+
+  renderAdminUsersTable(filtered);
+}
+window.filterAdminUsers = filterAdminUsers;
+
+// Open Add User Modal
+function openAdminAddUserModal() {
+  $('admin-user-modal-title').textContent = 'Tambah Pengguna Baru';
+  $('admin-user-id').value = '';
+  $('admin-user-display-name').value = '';
+  $('admin-user-username').value = '';
+  $('admin-user-username').readOnly = false;
+  $('admin-user-email').value = '';
+  $('admin-user-password').value = '';
+  $('admin-user-password').required = true;
+  $('admin-user-password-container').style.display = 'block';
+  $('admin-user-division').value = '';
+  $('admin-user-role').value = 'staff';
+  $('admin-user-jabatan').value = '';
+  $('admin-user-is-admin').checked = false;
+  $('admin-user-error').textContent = '';
+
+  $('modal-admin-user-overlay').classList.remove('hidden');
+}
+window.openAdminAddUserModal = openAdminAddUserModal;
+
+// Open Edit User Modal
+function openAdminEditUserModal(userId) {
+  const user = adminUsersList.find(u => u.id === userId);
+  if (!user) return;
+
+  $('admin-user-modal-title').textContent = 'Edit Pengguna';
+  $('admin-user-id').value = user.id;
+  $('admin-user-display-name').value = user.display_name || '';
+  $('admin-user-username').value = user.username || '';
+  $('admin-user-username').readOnly = true;
+  $('admin-user-email').value = user.email || '';
+  $('admin-user-password').value = '';
+  $('admin-user-password').required = false;
+  $('admin-user-password-container').style.display = 'none';
+  $('admin-user-division').value = user.division || '';
+  $('admin-user-role').value = user.role || 'staff';
+  $('admin-user-jabatan').value = user.jabatan || '';
+  $('admin-user-is-admin').checked = !!user.is_admin;
+  $('admin-user-error').textContent = '';
+
+  $('modal-admin-user-overlay').classList.remove('hidden');
+}
+window.openAdminEditUserModal = openAdminEditUserModal;
+
+// Close User Modal
+function closeAdminUserModal() {
+  $('modal-admin-user-overlay').classList.add('hidden');
+}
+window.closeAdminUserModal = closeAdminUserModal;
+
+// Submit Add / Edit User Form
+async function handleAdminUserSubmit(e) {
+  e.preventDefault();
+
+  const userId = $('admin-user-id').value;
+  const display_name = $('admin-user-display-name').value;
+  const username = $('admin-user-username').value;
+  const email = $('admin-user-email').value;
+  const division = $('admin-user-division').value;
+  const role = $('admin-user-role').value;
+  const jabatan = $('admin-user-jabatan').value;
+  const is_admin = $('admin-user-is-admin').checked;
+  const errorEl = $('admin-user-error');
+
+  errorEl.textContent = '';
+
+  const isEdit = !!userId;
+
+  let res;
+  if (isEdit) {
+    // Edit User
+    res = await apiFetch(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      body: { display_name, email, division, role, jabatan, is_admin }
+    });
+  } else {
+    // Add User
+    const password = $('admin-user-password').value;
+    if (password.length < 6) {
+      errorEl.textContent = 'Password minimal 6 karakter';
+      return;
+    }
+    res = await apiFetch('/api/admin/users', {
+      method: 'POST',
+      body: { username, display_name, email, password, division, role, jabatan, is_admin }
+    });
+  }
+
+  if (res) {
+    if (res.error) {
+      errorEl.textContent = res.error;
+    } else {
+      closeAdminUserModal();
+      await loadAdminUsers();
+      // If the edited user is the current logged-in user, update localStorage
+      if (isEdit && userId === currentUser.id) {
+        currentUser.display_name = display_name;
+        currentUser.email = email;
+        currentUser.division = division;
+        currentUser.role = role;
+        currentUser.jabatan = jabatan;
+        currentUser.is_admin = is_admin;
+        localStorage.setItem('chat_user', JSON.stringify(currentUser));
+
+        // Refresh sidebar display
+        const divisionLabels = {
+          marketing: 'Marketing',
+          sdm: 'SDM',
+          keuangan: 'Keuangan',
+          operasional: 'Operasional'
+        };
+        const divLabel = divisionLabels[currentUser.division] || '';
+        sidebarName.textContent = toTitleCase(currentUser.display_name) + (divLabel ? ` (${divLabel})` : '');
+
+        // If revoked admin status, force reload
+        if (!is_admin && role !== 'admin') {
+          location.reload();
+        }
+      }
+    }
+  } else {
+    errorEl.textContent = 'Gagal menyimpan data pengguna. Username atau email mungkin sudah terdaftar.';
+  }
+}
+window.handleAdminUserSubmit = handleAdminUserSubmit;
+
+// Open Reset Password Modal
+function openAdminResetPwdModal(userId) {
+  $('admin-reset-pwd-user-id').value = userId;
+  $('admin-reset-pwd-password').value = '';
+  $('admin-reset-pwd-error').textContent = '';
+  $('modal-admin-reset-pwd-overlay').classList.remove('hidden');
+}
+window.openAdminResetPwdModal = openAdminResetPwdModal;
+
+// Close Reset Password Modal
+function closeAdminResetPwdModal() {
+  $('modal-admin-reset-pwd-overlay').classList.add('hidden');
+}
+window.closeAdminResetPwdModal = closeAdminResetPwdModal;
+
+// Submit Reset Password Form
+async function handleAdminResetPwdSubmit(e) {
+  e.preventDefault();
+
+  const userId = $('admin-reset-pwd-user-id').value;
+  const password = $('admin-reset-pwd-password').value;
+  const errorEl = $('admin-reset-pwd-error');
+
+  errorEl.textContent = '';
+
+  if (password.length < 6) {
+    errorEl.textContent = 'Password minimal 6 karakter';
+    return;
+  }
+
+  const res = await apiFetch(`/api/admin/users/${userId}/password`, {
+    method: 'PUT',
+    body: { password }
+  });
+
+  if (res) {
+    if (res.error) {
+      errorEl.textContent = res.error;
+    } else {
+      closeAdminResetPwdModal();
+      alert('Password pengguna berhasil diperbarui!');
+    }
+  } else {
+    errorEl.textContent = 'Gagal memperbarui password pengguna.';
+  }
+}
+window.handleAdminResetPwdSubmit = handleAdminResetPwdSubmit;
+
+// Delete User
+async function deleteAdminUser(userId) {
+  if (userId === currentUser.id) {
+    alert('Anda tidak dapat menghapus akun Anda sendiri!');
+    return;
+  }
+
+  const user = adminUsersList.find(u => u.id === userId);
+  const name = user ? user.display_name : 'pengguna ini';
+
+  if (!confirm(`Apakah Anda yakin ingin menghapus akun ${name}? Seluruh data pesan dan dokumen yang dikirim oleh pengguna ini akan tetap ada, namun akun akan dihapus dari sistem.`)) {
+    return;
+  }
+
+  const res = await apiFetch(`/api/admin/users/${userId}`, {
+    method: 'DELETE'
+  });
+
+  if (res) {
+    if (res.error) {
+      alert(res.error);
+    } else {
+      await loadAdminUsers();
+    }
+  } else {
+    alert('Gagal menghapus pengguna.');
+  }
+}
+window.deleteAdminUser = deleteAdminUser;
+
+// Toggle Stats Summary Section in Sharing Folder
+function toggleStatsSection() {
+  const grid = $('stats-collapsible-grid');
+  const chevron = $('stats-toggle-chevron');
+  if (!grid) return;
+
+  const isCollapsed = grid.classList.toggle('collapsed');
+  if (chevron) {
+    chevron.textContent = isCollapsed ? '▼' : '▲';
+  }
+
+  localStorage.setItem('stats_collapsed', isCollapsed ? 'true' : 'false');
+}
+window.toggleStatsSection = toggleStatsSection;
+
 

@@ -118,3 +118,4 @@ dist/
 # Uploads and DB files
 uploads/
 *.db
+backup_intranet_chat.sql

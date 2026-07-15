@@ -28,8 +28,21 @@ async function runMigrations() {
     // 2. Add role column if it doesn't exist
     await pool.query(`
       ALTER TABLE users 
-      ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'staff' 
-      CHECK (role IN ('staff', 'management', 'top management'));
+      ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'staff';
+    `);
+
+    // 2a. Update role constraint to include 'admin'
+    await pool.query(`
+      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+    `);
+    await pool.query(`
+      ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('staff', 'management', 'top management', 'admin'));
+    `);
+
+    // 2b. Add is_admin column if it doesn't exist
+    await pool.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
     `);
 
     // 3. Add jabatan column if it doesn't exist
@@ -37,7 +50,7 @@ async function runMigrations() {
       ALTER TABLE users 
       ADD COLUMN IF NOT EXISTS jabatan VARCHAR(50) DEFAULT 'Staff';
     `);
-    
+
     // 4. Ensure default group rooms exist
     const defaultRooms = ['General', 'Marketing', 'SDM', 'Keuangan', 'Operasional'];
     for (const name of defaultRooms) {
@@ -133,7 +146,7 @@ async function runMigrations() {
     const notionCount = await pool.query("SELECT COUNT(*) FROM notion_pages");
     if (parseInt(notionCount.rows[0].count, 10) === 0) {
       console.log('🌱 Seeding default Notion pages...');
-      
+
       // Get a default user to set as creator (or set NULL)
       const userRes = await pool.query("SELECT id FROM users LIMIT 1");
       const defaultUserId = userRes.rows.length > 0 ? userRes.rows[0].id : null;
@@ -244,6 +257,21 @@ async function runMigrations() {
 
       console.log('🌱 Default Notion pages seeded successfully.');
     }
+
+    // document_views table for view history tracking
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_views (
+        id SERIAL PRIMARY KEY,
+        document_id UUID NOT NULL REFERENCES shared_documents(id) ON DELETE CASCADE,
+        viewer_name VARCHAR(255) NOT NULL,
+        viewer_jabatan VARCHAR(100),
+        viewer_division VARCHAR(100),
+        viewed_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_document_views_doc_id ON document_views(document_id);
+    `);
 
     console.log('✅ Migrasi database selesai.');
   } catch (err) {

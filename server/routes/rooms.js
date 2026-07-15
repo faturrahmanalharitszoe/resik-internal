@@ -9,11 +9,12 @@ router.use(authMiddleware);
 router.get('/', async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT r.id, r.name, r.type,
+      `SELECT r.id, r.name, r.type, r.created_by,
         (SELECT content FROM messages WHERE room_id = r.id AND is_deleted = false
          ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT created_at FROM messages WHERE room_id = r.id AND is_deleted = false
          ORDER BY created_at DESC LIMIT 1) as last_message_at,
+        (SELECT COUNT(*) FROM room_members WHERE room_id = r.id)::int as member_count,
         u.id as dm_user_id,
         u.display_name as dm_user_display_name,
         u.username as dm_user_username,
@@ -197,6 +198,129 @@ router.get('/meta/users', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/rooms/:id/members — list members of a group room
+router.get('/:id/members', async (req, res) => {
+  const { id } = req.params;
+
+  // Must be a member to view
+  const isMember = await db.query(
+    'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2',
+    [id, req.user.id]
+  );
+  if (isMember.rows.length === 0) {
+    return res.status(403).json({ error: 'Akses ditolak' });
+  }
+
+  try {
+    const result = await db.query(
+      `SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online,
+              u.division, u.jabatan, rm.joined_at,
+              r.created_by = u.id as is_creator
+       FROM room_members rm
+       JOIN users u ON rm.user_id = u.id
+       JOIN rooms r ON r.id = rm.room_id
+       WHERE rm.room_id = $1
+       ORDER BY rm.joined_at ASC`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('get members error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/rooms/:id/members — add a member to a group room
+router.post('/:id/members', async (req, res) => {
+  const { id } = req.params;
+  const { user_id } = req.body;
+
+  if (!user_id) return res.status(400).json({ error: 'user_id wajib diisi' });
+
+  // Must be a member to add others
+  const isMember = await db.query(
+    'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2',
+    [id, req.user.id]
+  );
+  if (isMember.rows.length === 0) {
+    return res.status(403).json({ error: 'Akses ditolak' });
+  }
+
+  // Only works on group rooms
+  const room = await db.query('SELECT type FROM rooms WHERE id = $1', [id]);
+  if (room.rows.length === 0) return res.status(404).json({ error: 'Room tidak ditemukan' });
+  if (room.rows[0].type !== 'group') return res.status(400).json({ error: 'Hanya room grup yang bisa menambah anggota' });
+
+  try {
+    // Add the user (ignore if already a member)
+    await db.query(
+      'INSERT INTO room_members (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [id, user_id]
+    );
+
+    // Fetch the new member's details to broadcast
+    const userResult = await db.query(
+      `SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online,
+              u.division, u.jabatan
+       FROM users u WHERE u.id = $1`,
+      [user_id]
+    );
+    const newMember = userResult.rows[0];
+
+    // Notify the new member's socket to join the room
+    req.io.to(`user_${user_id}`).emit('join_new_room', { room_id: id });
+
+    // Notify everyone already in the room about the new member
+    req.io.to(id).emit('member_added', { room_id: id, user: newMember });
+
+    res.status(201).json(newMember);
+  } catch (err) {
+    console.error('add member error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/rooms/:id/members/:userId — remove a member from a group room
+router.delete('/:id/members/:userId', async (req, res) => {
+  const { id, userId } = req.params;
+
+  // Must be a member to perform this action
+  const isMember = await db.query(
+    'SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2',
+    [id, req.user.id]
+  );
+  if (isMember.rows.length === 0) {
+    return res.status(403).json({ error: 'Akses ditolak' });
+  }
+
+  // Permission: can remove yourself, or room creator can remove anyone
+  if (req.user.id !== userId) {
+    const room = await db.query('SELECT created_by FROM rooms WHERE id = $1', [id]);
+    if (room.rows.length === 0) return res.status(404).json({ error: 'Room tidak ditemukan' });
+    if (room.rows[0].created_by !== req.user.id) {
+      return res.status(403).json({ error: 'Hanya pembuat room yang bisa mengeluarkan anggota lain' });
+    }
+  }
+
+  try {
+    await db.query(
+      'DELETE FROM room_members WHERE room_id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    // Notify the removed user to leave the room client-side
+    req.io.to(`user_${userId}`).emit('removed_from_room', { room_id: id });
+
+    // Notify everyone in the room that a member was removed
+    req.io.to(id).emit('member_removed', { room_id: id, user_id: userId });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('remove member error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

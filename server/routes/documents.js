@@ -32,7 +32,7 @@ const upload = multer({
 // GET /api/documents/projects
 router.get('/projects', async (req, res) => {
   try {
-    const result = await db.query('SELECT id, name FROM projects ORDER BY name ASC');
+    const result = await db.query("SELECT kode AS id, kode || ' - ' || description AS name FROM kode WHERE category = 'DEPARTMENT' AND aktif = 1 ORDER BY description ASC");
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching projects:', err);
@@ -50,12 +50,16 @@ router.get('/recipients', async (req, res) => {
       keuangan: 'Keuangan',
       operasional: 'Operasional'
     };
+    const jabatanLabels = {
+      'SM': 'Senior Manager',
+      'Wakil Direktur': 'Wakil Direktur Utama'
+    };
     const mapped = result.rows.map(row => ({
       username: row.username,
       name: row.name,
       role: row.role,
       divisi: divisionLabels[row.divisi] || row.divisi,
-      jabatan: row.jabatan
+      jabatan: jabatanLabels[row.jabatan] || row.jabatan
     }));
     res.json(mapped);
   } catch (err) {
@@ -118,14 +122,19 @@ router.get('/', async (req, res) => {
     let query = '';
     let params = [];
 
-    if (role === 'top management') {
+    if (role === 'top management' || user.is_admin) {
       // Direktur sees all documents
-      query = 'SELECT * FROM shared_documents ORDER BY tgl DESC';
-    } else if (role === 'management' && jabatan === 'SM') {
-      // SM sees division documents
+      query = `
+        SELECT d.*, COALESCE(d.sender_division, u.division) AS sender_division
+        FROM shared_documents d
+        LEFT JOIN users u ON d.user_id = u.id
+        ORDER BY d.tgl DESC
+      `;
+    } else if (role === 'management' && (jabatan === 'SM' || jabatan === 'Senior Manager')) {
+      // Senior Manager sees division documents
       let targetDivisions = [division];
       let subDivs = [];
-      
+
       if (division === 'keuangan') {
         subDivs = ['Payment', 'Payroll', 'IT', 'Keuangan', 'Accounting'];
       } else if (division === 'sdm') {
@@ -137,15 +146,15 @@ router.get('/', async (req, res) => {
       }
 
       query = `
-        SELECT DISTINCT d.* 
+        SELECT DISTINCT d.*, COALESCE(d.sender_division, u.division) AS sender_division
         FROM shared_documents d
         LEFT JOIN users u ON d.user_id = u.id
         WHERE d.sender_division = $1
            OR u.division = $1
            OR d.sender_name = ANY($2::text[])
            OR EXISTS (
-             SELECT 1 FROM users u2 
-             WHERE u2.division = $1 
+             SELECT 1 FROM users u2
+             WHERE u2.division = $1
                AND u2.display_name = ANY(string_to_array(d.penerima, ','))
            )
            OR EXISTS (
@@ -156,9 +165,10 @@ router.get('/', async (req, res) => {
       `;
       params = [division, [...subDivs, division]];
     } else {
-      // Staff sees:
+      // User sees:
       // - Documents sent by them
       // - Documents where they or one of their group labels is in the recipients
+      // Higher jabatan in same division also sees documents sent to lower jabatan in that division
       const userGroups = [displayName];
       const divisionLabels = {
         marketing: 'Marketing',
@@ -167,38 +177,55 @@ router.get('/', async (req, res) => {
         operasional: 'Operasional'
       };
       const mappedDiv = divisionLabels[division] || division;
+
+      // Jabatan hierarchy: higher index = higher level
+      const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
+      const userLevel = jabatanHierarchy.indexOf(jabatan);
+
       if (mappedDiv) {
+        // Always include own division group and own jabatan+divisi combo
         userGroups.push('Divisi ' + mappedDiv);
         if (jabatan) {
           userGroups.push(jabatan + ' ' + mappedDiv);
         }
+        // If user is above Staff level, also include all lower jabatan+divisi combos in same division
+        if (userLevel > 0) {
+          jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
+            userGroups.push(lowerJab + ' ' + mappedDiv);
+          });
+        }
       }
+
       if (jabatan === 'Direktur Umum') {
         userGroups.push('Direktur Umum');
-      } else if (jabatan === 'Wakil Direktur') {
+      } else if (jabatan === 'Wakil Direktur' || jabatan === 'Wakil Direktur Utama') {
         userGroups.push('Wakil Direktur');
+        userGroups.push('Wakil Direktur Utama');
       } else if (jabatan === 'Direktur') {
         userGroups.push('Direktur');
-      } else if (jabatan === 'SM') {
+      } else if (jabatan === 'SM' || jabatan === 'Senior Manager') {
         userGroups.push('Semua SM');
+        userGroups.push('Semua Senior Manager');
       } else if (jabatan === 'Staff') {
         userGroups.push('Semua Staff');
       }
 
       query = `
-        SELECT * FROM shared_documents 
-        WHERE sender_name = $1 
+        SELECT d.*, COALESCE(d.sender_division, u.division) AS sender_division
+        FROM shared_documents d
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE d.sender_name = $1
            OR EXISTS (
-             SELECT 1 FROM unnest(string_to_array(penerima, ',')) rec
+             SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec
              WHERE rec = ANY($2::text[])
            )
-        ORDER BY tgl DESC
+        ORDER BY d.tgl DESC
       `;
       params = [displayName, userGroups];
     }
 
     const result = await db.query(query, params);
-    
+
     // Map database field names to what frontend expects
     const mappedDocs = result.rows.map(row => ({
       id: row.id,
@@ -227,7 +254,7 @@ router.get('/', async (req, res) => {
 router.post('/submit_document', upload.single('file'), async (req, res) => {
   try {
     const { project_name, document_type, sub_tipe, document_name, document_number, description, penerima, senderName, senderDivision, userId, tgl } = req.body;
-    
+
     if (!project_name || !document_type || !document_number) {
       if (req.file) fs.unlinkSync(req.file.path);
       return res.status(400).json({ error: 'Project name, document type, and document number are required' });
@@ -238,7 +265,7 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
     }
 
     // Server-side validation: Staff cannot upload 'Kontrak'
-    if (document_type.toLowerCase() === 'kontrak' && req.user.role === 'staff') {
+    if (document_type.toLowerCase() === 'kontrak' && req.user.role === 'staff' && !req.user.is_admin) {
       fs.unlinkSync(req.file.path);
       return res.status(403).json({ error: 'Staf biasa tidak diperbolehkan mengunggah dokumen tipe Kontrak' });
     }
@@ -268,16 +295,16 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
          RETURNING *`;
 
     const queryParams = [
-      project_name, 
-      document_type, 
-      sub_tipe || '', 
-      document_name || '', 
-      document_number, 
-      description || '', 
-      filePath, 
-      senderName || req.user.display_name, 
-      senderDivision || req.user.division, 
-      userId || req.user.id, 
+      project_name,
+      document_type,
+      sub_tipe || '',
+      document_name || '',
+      document_number,
+      description || '',
+      filePath,
+      senderName || req.user.display_name,
+      senderDivision || req.user.division,
+      userId || req.user.id,
       penerimaString
     ];
     if (tgl) {
@@ -290,7 +317,7 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
   } catch (err) {
     console.error('Error submitting document:', err);
     if (req.file && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      try { fs.unlinkSync(req.file.path); } catch (e) { }
     }
     res.status(500).json({ error: 'Database error' });
   }
@@ -312,12 +339,12 @@ router.put('/edit_document', async (req, res) => {
     }
 
     const doc = docCheck.rows[0];
-    if (doc.user_id !== req.user.id && req.user.role !== 'top management') {
+    if (doc.user_id !== req.user.id && req.user.role !== 'top management' && !req.user.is_admin) {
       return res.status(403).json({ error: 'Anda tidak memiliki hak untuk mengubah dokumen ini' });
     }
 
     // Server-side validation: Staff cannot change document to 'Kontrak'
-    if (document_type && document_type.toLowerCase() === 'kontrak' && req.user.role === 'staff') {
+    if (document_type && document_type.toLowerCase() === 'kontrak' && req.user.role === 'staff' && !req.user.is_admin) {
       return res.status(403).json({ error: 'Staf biasa tidak diperbolehkan mengubah dokumen menjadi tipe Kontrak' });
     }
 
@@ -387,11 +414,11 @@ async function checkDocumentAccess(doc, user) {
   const division = user.division;
   const jabatan = user.jabatan || 'Staff';
 
-  if (role === 'top management') {
+  if (role === 'top management' || user.is_admin) {
     return true;
   }
 
-  if (role === 'management' && jabatan === 'SM') {
+  if (role === 'management' && (jabatan === 'SM' || jabatan === 'Senior Manager')) {
     let subDivs = [];
     if (division === 'keuangan') {
       subDivs = ['Payment', 'Payroll', 'IT', 'Keuangan', 'Accounting'];
@@ -403,7 +430,7 @@ async function checkDocumentAccess(doc, user) {
       subDivs = ['marketing'];
     }
     const allowedDivs = [...subDivs, division].map(d => d.toLowerCase());
-    
+
     const queryCheck = await db.query(`
       SELECT 1 FROM shared_documents d
       LEFT JOIN users u ON d.user_id = u.id
@@ -422,11 +449,11 @@ async function checkDocumentAccess(doc, user) {
         )
       )
     `, [doc.id, division, [...subDivs, division]]);
-    
+
     return queryCheck.rows.length > 0;
   }
 
-  // Staff access
+  // Staff / management access with hierarchy
   const userGroups = [displayName];
   const divisionLabels = {
     marketing: 'Marketing',
@@ -435,20 +462,31 @@ async function checkDocumentAccess(doc, user) {
     operasional: 'Operasional'
   };
   const mappedDiv = divisionLabels[division] || division;
+  const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'SM', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
+  const userLevel = jabatanHierarchy.indexOf(jabatan);
+
   if (mappedDiv) {
     userGroups.push('Divisi ' + mappedDiv);
     if (jabatan) {
       userGroups.push(jabatan + ' ' + mappedDiv);
     }
+    // Higher-level users can also see docs sent to lower jabatan in same division
+    if (userLevel > 0) {
+      jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
+        userGroups.push(lowerJab + ' ' + mappedDiv);
+      });
+    }
   }
   if (jabatan === 'Direktur Umum') {
     userGroups.push('Direktur Umum');
-  } else if (jabatan === 'Wakil Direktur') {
+  } else if (jabatan === 'Wakil Direktur' || jabatan === 'Wakil Direktur Utama') {
     userGroups.push('Wakil Direktur');
+    userGroups.push('Wakil Direktur Utama');
   } else if (jabatan === 'Direktur') {
     userGroups.push('Direktur');
-  } else if (jabatan === 'SM') {
+  } else if (jabatan === 'SM' || jabatan === 'Senior Manager') {
     userGroups.push('Semua SM');
+    userGroups.push('Semua Senior Manager');
   } else if (jabatan === 'Staff') {
     userGroups.push('Semua Staff');
   }
@@ -490,7 +528,7 @@ router.get('/viewonly', async (req, res) => {
   if (!file_path) {
     return res.status(400).send('File path is required');
   }
-  
+
   const filename = path.basename(file_path);
   const dbPath = '/uploads/' + filename;
 
@@ -514,6 +552,46 @@ router.get('/viewonly', async (req, res) => {
   } catch (err) {
     console.error('Error fetching file in viewonly:', err);
     res.status(500).send('Server error');
+  }
+});
+
+// POST /api/documents/:id/view — log a view event
+router.post('/:id/view', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    await db.query(
+      `INSERT INTO document_views (document_id, viewer_name, viewer_jabatan, viewer_division)
+       VALUES ($1, $2, $3, $4)`,
+      [id, user.display_name, user.jabatan || null, user.division || null]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error logging document view:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/documents/:id/views — list view history for a document
+router.get('/:id/views', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Only sender or top management can see full view history
+    const docResult = await db.query('SELECT sender_name FROM shared_documents WHERE id = $1', [id]);
+    if (docResult.rows.length === 0) return res.status(404).json({ error: 'Dokumen tidak ditemukan' });
+
+    const result = await db.query(
+      `SELECT viewer_name, viewer_jabatan, viewer_division, viewed_at
+       FROM document_views
+       WHERE document_id = $1
+       ORDER BY viewed_at DESC
+       LIMIT 50`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching document views:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

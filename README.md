@@ -1,11 +1,11 @@
-# Intranet Chat
+# Resik Internal
 
 Web chat internal berbasis Node.js + Socket.IO + PostgreSQL.
 
 ## Struktur Project
 
 ```
-intranet-chat/
+resik-internal/
 ├── server/
 │   ├── index.js          # Entry point
 │   ├── db.js             # Koneksi PostgreSQL

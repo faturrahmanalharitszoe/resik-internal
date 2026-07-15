@@ -37,4 +37,11 @@ function socketAuth(socket, next) {
   }
 }
 
-module.exports = { authMiddleware, socketAuth };
+function adminMiddleware(req, res, next) {
+  if (!req.user || !req.user.is_admin) {
+    return res.status(403).json({ error: 'Akses ditolak: Memerlukan hak akses administrator' });
+  }
+  next();
+}
+
+module.exports = { authMiddleware, socketAuth, adminMiddleware };

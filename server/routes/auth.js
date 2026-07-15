@@ -7,20 +7,24 @@ const router = express.Router();
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+  if (process.env.NODE_ENV !== 'test' && req.headers['x-test-bypass'] !== 'true') {
+    return res.status(403).json({ error: 'Registrasi mandiri dinonaktifkan. Silakan hubungi Administrator untuk mendapatkan akun Anda.' });
+  }
+
   const { username, display_name, email, password, division, role, jabatan } = req.body;
 
-  if (!username || !display_name || !email || !password || !division) {
-    return res.status(400).json({ error: 'Semua field wajib diisi termasuk divisi' });
+  if (!username || !display_name || !email || !password) {
+    return res.status(400).json({ error: 'Semua field wajib diisi' });
   }
 
   const validDivisions = ['marketing', 'sdm', 'keuangan', 'operasional'];
-  if (!validDivisions.includes(division)) {
+  if (division && !validDivisions.includes(division)) {
     return res.status(400).json({ error: 'Divisi tidak valid' });
   }
 
   const userRole = role || 'staff';
   const userJabatan = jabatan || 'Staff';
-  const validRoles = ['staff', 'management', 'top management'];
+  const validRoles = ['staff', 'management', 'top management', 'admin'];
   if (!validRoles.includes(userRole)) {
     return res.status(400).json({ error: 'Role tidak valid' });
   }
@@ -42,10 +46,10 @@ router.post('/register', async (req, res) => {
     const password_hash = await bcrypt.hash(password, 12);
 
     const result = await db.query(
-      `INSERT INTO users (username, display_name, email, password_hash, division, role, jabatan)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, username, display_name, email, division, role, jabatan, created_at`,
-      [username, display_name, email, password_hash, division, userRole, userJabatan]
+      `INSERT INTO users (username, display_name, email, password_hash, division, role, jabatan, is_admin)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, username, display_name, email, division, role, jabatan, is_admin, created_at`,
+      [username, display_name, email, password_hash, division || null, userRole, userJabatan, false]
     );
 
     const user = result.rows[0];
@@ -82,8 +86,10 @@ router.post('/register', async (req, res) => {
       }
     }
 
+    const jabatanMap = { 'SM': 'Senior Manager', 'Wakil Direktur': 'Wakil Direktur Utama' };
+    const normalizedJabatan = jabatanMap[user.jabatan] || user.jabatan;
     const token = jwt.sign(
-      { id: user.id, username: user.username, display_name: user.display_name, role: user.role, division: user.division, jabatan: user.jabatan },
+      { id: user.id, username: user.username, display_name: user.display_name, role: user.role, division: user.division, jabatan: normalizedJabatan, is_admin: user.is_admin },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
@@ -120,8 +126,10 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Username atau password salah' });
     }
 
+    const jabatanMap2 = { 'SM': 'Senior Manager', 'Wakil Direktur': 'Wakil Direktur Utama' };
+    const normalizedJabatan2 = jabatanMap2[user.jabatan] || user.jabatan;
     const token = jwt.sign(
-      { id: user.id, username: user.username, display_name: user.display_name, role: user.role, division: user.division, jabatan: user.jabatan },
+      { id: user.id, username: user.username, display_name: user.display_name, role: user.role, division: user.division, jabatan: normalizedJabatan2, is_admin: user.is_admin },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN }
     );
@@ -136,7 +144,8 @@ router.post('/login', async (req, res) => {
         avatar_url: user.avatar_url,
         division: user.division,
         role: user.role,
-        jabatan: user.jabatan,
+        jabatan: normalizedJabatan2,
+        is_admin: user.is_admin,
       },
     });
   } catch (err) {

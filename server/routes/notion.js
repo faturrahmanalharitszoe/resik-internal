@@ -8,7 +8,7 @@ router.use(authMiddleware);
 // Helper function to check if user can access a page
 async function canAccessPage(user, page) {
   // Top management can access everything
-  if (user.role === 'top management') {
+  if (user.role === 'top management' || user.is_admin) {
     return true;
   }
 

@@ -592,6 +592,20 @@ function connectSocket() {
     }
   });
 
+  socket.on('message_deleted', ({ message_id }) => {
+    // Replace message content with deleted state
+    const group = messagesList.querySelector(`[data-msg-id="${message_id}"]`);
+    if (group) {
+      const bubble = group.querySelector('.msg-bubble');
+      if (bubble) {
+        bubble.innerHTML = '<em>Pesan ini telah dihapus</em>';
+        bubble.classList.add('deleted-bubble');
+      }
+      const deleteBtn = group.querySelector('.msg-delete-btn');
+      if (deleteBtn) deleteBtn.remove();
+    }
+  });
+
   socket.on('join_new_room', ({ room_id }) => {
     socket.emit('join_room', { room_id });
     loadRooms().then(() => {
@@ -829,24 +843,65 @@ function updateRoomPreview(roomId, content) {
 /* ─── MESSAGE RENDERING ─── */
 function appendMessage(msg) {
   const isOwn = msg.sender_id === currentUser.id;
+  const isAdmin = currentUser.is_admin;
+  const canDelete = isOwn || isAdmin;
   const initials = (msg.display_name || '?').slice(0, 2).toUpperCase();
   const time = new Date(msg.created_at).toLocaleTimeString('id-ID', {
     hour: '2-digit', minute: '2-digit',
   });
 
+  if (msg.is_deleted) {
+    const group = document.createElement('div');
+    group.className = 'msg-group' + (isOwn ? ' own' : '') + ' deleted';
+    group.dataset.msgId = msg.id;
+    group.innerHTML = `
+      <div class="avatar-circle">${initials}</div>
+      <div class="msg-content">
+        <div class="msg-meta">
+          <span class="msg-sender">${isOwn ? 'Kamu' : esc(toTitleCase(msg.display_name))}</span>
+          <span class="msg-time">${time}</span>
+        </div>
+        <div class="msg-bubble deleted-bubble"><em>Pesan ini telah dihapus</em></div>
+      </div>
+    `;
+    messagesList.appendChild(group);
+    return;
+  }
+
+  const deleteBtn = canDelete ? `
+    <button class="msg-delete-btn" onclick="deleteMessage('${msg.id}')" title="Hapus pesan">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+    </button>` : '';
+
   const group = document.createElement('div');
   group.className = 'msg-group' + (isOwn ? ' own' : '');
+  group.dataset.msgId = msg.id;
   group.innerHTML = `
     <div class="avatar-circle">${initials}</div>
     <div class="msg-content">
       <div class="msg-meta">
         <span class="msg-sender">${isOwn ? 'Kamu' : esc(toTitleCase(msg.display_name))}</span>
         <span class="msg-time">${time}</span>
+        ${deleteBtn}
       </div>
       <div class="msg-bubble" data-msg-id="${msg.id}">${esc(msg.content)}</div>
     </div>
   `;
   messagesList.appendChild(group);
+}
+
+function deleteMessage(msgId) {
+  showCustomConfirm('Hapus pesan ini untuk semua orang?').then(confirmed => {
+    if (!confirmed) return;
+    socket.emit('delete_message', { message_id: msgId, room_id: currentRoomId }, (res) => {
+      if (res?.error) showCustomAlert(res.error);
+    });
+  });
 }
 
 function appendDateDivider(dateStr) {
@@ -1627,10 +1682,17 @@ function renderDocumentsTable() {
     }).join('');
 
     const canEdit = (doc.senderName || '').toLowerCase().trim() === (currentUser.display_name || '').toLowerCase().trim();
+    const canDelete = canEdit || currentUser.is_admin;
     const editBtn = canEdit
       ? `<button class="btn-action edit-btn" onclick="event.stopPropagation(); openEditModal('${doc.id}')">
            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
            Ubah
+         </button>`
+      : '';
+    const deleteDocBtn = canDelete
+      ? `<button class="btn-action delete-btn" onclick="event.stopPropagation(); deleteDocument('${doc.id}', '${esc(doc.document_name)}')">
+           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+           Hapus
          </button>`
       : '';
 
@@ -1663,6 +1725,7 @@ function renderDocumentsTable() {
           Detail
         </button>
         ${editBtn}
+        ${deleteDocBtn}
       </td>
     `;
 
@@ -1675,6 +1738,25 @@ function changeSharingPage(dir) {
   renderDocumentsTable();
 }
 window.changeSharingPage = changeSharingPage;
+
+async function deleteDocument(docId, docName) {
+  const confirmed = await showCustomConfirm(`Hapus dokumen "${docName}" secara permanen? File juga akan ikut terhapus.`);
+  if (!confirmed) return;
+  try {
+    const res = await fetch(`${API}/api/documents/${docId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok) { showCustomAlert(data.error || 'Gagal menghapus dokumen'); return; }
+    showCustomAlert('Dokumen berhasil dihapus!');
+    sharedDocuments = sharedDocuments.filter(d => d.id !== docId);
+    renderDocumentsTable();
+  } catch (err) {
+    showCustomAlert('Terjadi kesalahan saat menghapus dokumen');
+  }
+}
+window.deleteDocument = deleteDocument;
 
 function setupDragAndDrop() {
   const dropzone = $('upload-dropzone');

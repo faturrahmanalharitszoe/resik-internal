@@ -595,4 +595,37 @@ router.get('/:id/views', async (req, res) => {
   }
 });
 
+
+// DELETE /api/documents/:id — delete a document (owner, top management, or admin)
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    const docResult = await db.query('SELECT * FROM shared_documents WHERE id = $1', [id]);
+    if (docResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Dokumen tidak ditemukan' });
+    }
+
+    const doc = docResult.rows[0];
+
+    // Only owner, top management, or admin can delete
+    if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin) {
+      return res.status(403).json({ error: 'Anda tidak memiliki hak untuk menghapus dokumen ini' });
+    }
+
+    // Delete physical file
+    const filePath = path.join(__dirname, '../..', doc.file_path);
+    if (fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting file:', e); }
+    }
+
+    await db.query('DELETE FROM shared_documents WHERE id = $1', [id]);
+    res.json({ message: 'Dokumen berhasil dihapus' });
+  } catch (err) {
+    console.error('Error deleting document:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

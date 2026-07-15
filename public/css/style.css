@@ -656,6 +656,28 @@ body {
   flex-shrink: 0;
 }
 
+.chat-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .room-title {
   font-size: 15px;
   font-weight: 600;

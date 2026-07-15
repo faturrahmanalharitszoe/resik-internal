@@ -2069,6 +2069,15 @@ function openDetailModal(docId) {
     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
+  if (doc.updated_at) {
+    $('peek-tgl-edit-row').style.display = 'flex';
+    $('peek-tgl-edit').textContent = new Date(doc.updated_at).toLocaleString('id-ID', {
+      day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  } else {
+    $('peek-tgl-edit-row').style.display = 'none';
+  }
+
   const displayRecs = getDisplayRecipients(doc.penerima);
   $('peek-recipients').innerHTML = displayRecs.map(r => {
     const tagClass = getTagClassForRecipient(r);

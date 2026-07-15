@@ -373,6 +373,7 @@ router.put('/edit_document', async (req, res) => {
              document_number = $5, 
              description = $6, 
              penerima = $7,
+             updated_at = NOW(),
              tgl = $8
          WHERE id = $9
          RETURNING *`
@@ -383,7 +384,8 @@ router.put('/edit_document', async (req, res) => {
              document_name = $4, 
              document_number = $5, 
              description = $6, 
-             penerima = $7
+             penerima = $7,
+             updated_at = NOW()
          WHERE id = $8
          RETURNING *`;
 

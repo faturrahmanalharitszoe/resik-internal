@@ -208,10 +208,10 @@ const sidebarName = $('sidebar-name');
 const roomList = $('room-list');
 const emptyState = $('empty-state');
 const chatView = $('chat-view');
-const chatRoomName = $('chat-room-name');
+const chatRoomName = $('chat-title');
 const chatMembersCount = $('chat-members-count');
 const messagesList = $('messages-list');
-const messageInput = $('message-input');
+const messageInput = $('chat-input');
 const typingIndicator = $('typing-indicator');
 const modalOverlay = $('modal-overlay');
 

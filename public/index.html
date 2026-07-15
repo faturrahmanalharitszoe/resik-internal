@@ -254,6 +254,7 @@
           </button>
           <div class="chat-header-info">
             <span id="chat-title" class="chat-title"># ruangan</span>
+            <span id="chat-members-count" class="chat-meta"></span>
             <span id="chat-meta" class="chat-meta"></span>
           </div>
           <button id="btn-toggle-members" class="btn-members-toggle hidden" onclick="toggleMembersPanel()"
@@ -267,9 +268,12 @@
         </div>
         <div class="chat-body-wrapper">
           <div class="chat-main-area">
-            <div id="messages-container" class="messages-container"></div>
+            <div id="messages-container" class="messages-container">
+              <div id="messages-list" class="messages-list"></div>
+            </div>
+            <div id="typing-indicator" class="typing-indicator hidden"></div>
             <div class="chat-input-area">
-              <textarea id="chat-input" rows="1" placeholder="Ketik pesan..."></textarea>
+              <textarea id="chat-input" rows="1" placeholder="Ketik pesan..." class="message-input"></textarea>
               <button id="btn-send" class="btn-send" title="Kirim">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="22" y1="2" x2="11" y2="13" />

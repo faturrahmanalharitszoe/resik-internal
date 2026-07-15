@@ -15,7 +15,7 @@ CREATE TABLE users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   avatar_url VARCHAR(500),
-  division VARCHAR(50) CHECK (division IN ('marketing', 'sdm', 'keuangan', 'operasional')),
+  division VARCHAR(50) CHECK (division IN ('marketing', 'sdm', 'keuangan', 'operasional', 'it')),
   role VARCHAR(50) DEFAULT 'staff',
   jabatan VARCHAR(100) DEFAULT 'Staff',
   is_admin BOOLEAN DEFAULT false,
@@ -67,3 +67,4 @@ INSERT INTO rooms (name, type) VALUES ('Marketing', 'group');
 INSERT INTO rooms (name, type) VALUES ('SDM', 'group');
 INSERT INTO rooms (name, type) VALUES ('Keuangan', 'group');
 INSERT INTO rooms (name, type) VALUES ('Operasional', 'group');
+INSERT INTO rooms (name, type) VALUES ('IT', 'group');

@@ -17,7 +17,7 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Semua field wajib diisi' });
   }
 
-  const validDivisions = ['marketing', 'sdm', 'keuangan', 'operasional'];
+  const validDivisions = ['marketing', 'sdm', 'keuangan', 'operasional', 'it'];
   if (division && !validDivisions.includes(division)) {
     return res.status(400).json({ error: 'Divisi tidak valid' });
   }
@@ -70,7 +70,8 @@ router.post('/register', async (req, res) => {
       marketing: 'Marketing',
       sdm: 'SDM',
       keuangan: 'Keuangan',
-      operasional: 'Operasional'
+      operasional: 'Operasional',
+      it: 'IT'
     };
     const roomName = divisionRoomMap[division];
     if (roomName) {

@@ -34,8 +34,8 @@ npm install
 ### 2. Setup PostgreSQL
 Buat database baru dan jalankan schema:
 ```bash
-createdb intranet_chat
-psql -d intranet_chat -f schema.sql
+createdb resik_internal
+psql -d resik_internal -f schema.sql
 ```
 
 ### 3. Konfigurasi environment

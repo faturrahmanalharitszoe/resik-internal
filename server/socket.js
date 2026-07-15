@@ -89,13 +89,18 @@ module.exports = function setupSocket(io) {
     // Delete message
     socket.on('delete_message', async ({ message_id, room_id }, callback) => {
       try {
+        const isAdmin = user.is_admin || user.username === 'admin' || user.username === 'administrator';
+        if (!isAdmin) {
+          return callback?.({ error: 'Hanya Admin yang dapat menghapus pesan' });
+        }
+
         const result = await db.query(
-          'UPDATE messages SET is_deleted = true WHERE id = $1 AND sender_id = $2 RETURNING id',
-          [message_id, user.id]
+          'UPDATE messages SET is_deleted = true WHERE id = $1 RETURNING id',
+          [message_id]
         );
 
         if (result.rows.length === 0) {
-          return callback?.({ error: 'Pesan tidak ditemukan atau bukan milikmu' });
+          return callback?.({ error: 'Pesan tidak ditemukan' });
         }
 
         io.to(room_id).emit('message_deleted', { message_id, room_id });

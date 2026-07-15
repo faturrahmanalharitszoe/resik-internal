@@ -843,8 +843,8 @@ function updateRoomPreview(roomId, content) {
 /* ─── MESSAGE RENDERING ─── */
 function appendMessage(msg) {
   const isOwn = msg.sender_id === currentUser.id;
-  const isAdmin = currentUser.is_admin;
-  const canDelete = isOwn || isAdmin;
+  const isAdmin = currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator';
+  const canDelete = isAdmin;
   const initials = (msg.display_name || '?').slice(0, 2).toUpperCase();
   const time = new Date(msg.created_at).toLocaleTimeString('id-ID', {
     hour: '2-digit', minute: '2-digit',
@@ -1707,7 +1707,7 @@ function renderDocumentsTable() {
     }).join('');
 
     const canEdit = (doc.senderName || '').toLowerCase().trim() === (currentUser.display_name || '').toLowerCase().trim();
-    const canDelete = canEdit || currentUser.is_admin;
+    const canDelete = currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator';
     const editBtn = canEdit
       ? `<button class="btn-action edit-btn" onclick="event.stopPropagation(); openEditModal('${doc.id}')">
            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>

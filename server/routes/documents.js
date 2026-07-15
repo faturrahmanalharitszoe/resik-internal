@@ -240,7 +240,8 @@ router.get('/', async (req, res) => {
       senderDivision: row.sender_division,
       penerima: row.penerima,
       tgl: row.tgl,
-      created_at: row.created_at
+      created_at: row.created_at,
+      updated_at: row.updated_at
     }));
 
     res.json(mappedDocs);

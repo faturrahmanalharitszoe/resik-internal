@@ -869,14 +869,16 @@ function appendMessage(msg) {
   }
 
   const deleteBtn = canDelete ? `
-    <button class="msg-delete-btn" onclick="deleteMessage('${msg.id}')" title="Hapus pesan">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-        <path d="M10 11v6M14 11v6"/>
-        <path d="M9 6V4h6v2"/>
+    <button class="msg-kebab-btn" onclick="toggleMsgMenu(event, '${msg.id}')" title="Pilihan">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="5" r="1.5"/>
+        <circle cx="12" cy="12" r="1.5"/>
+        <circle cx="12" cy="19" r="1.5"/>
       </svg>
-    </button>` : '';
+    </button>
+    <div class="msg-menu hidden" id="msg-menu-${msg.id}">
+      <button class="msg-menu-item delete" onclick="deleteMessage('${msg.id}')">Hapus Pesan</button>
+    </div>` : '';
 
   const group = document.createElement('div');
   group.className = 'msg-group' + (isOwn ? ' own' : '');
@@ -887,13 +889,36 @@ function appendMessage(msg) {
       <div class="msg-meta">
         <span class="msg-sender">${isOwn ? 'Kamu' : esc(toTitleCase(msg.display_name))}</span>
         <span class="msg-time">${time}</span>
-        ${deleteBtn}
+        <div class="msg-actions-wrap">${deleteBtn}</div>
       </div>
       <div class="msg-bubble" data-msg-id="${msg.id}">${esc(msg.content)}</div>
     </div>
   `;
   messagesList.appendChild(group);
+
+  if (canDelete) {
+    const bubble = group.querySelector('.msg-bubble');
+    bubble.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      deleteMessage(msg.id);
+    });
+  }
 }
+
+function toggleMsgMenu(e, msgId) {
+  e.stopPropagation();
+  const allMenus = document.querySelectorAll('.msg-menu');
+  allMenus.forEach(menu => {
+    if (menu.id !== `msg-menu-${msgId}`) menu.classList.add('hidden');
+  });
+  const menu = document.getElementById(`msg-menu-${msgId}`);
+  if (menu) menu.classList.toggle('hidden');
+}
+
+document.addEventListener('click', () => {
+  const allMenus = document.querySelectorAll('.msg-menu');
+  allMenus.forEach(menu => menu.classList.add('hidden'));
+});
 
 function deleteMessage(msgId) {
   showCustomConfirm('Hapus pesan ini untuk semua orang?').then(confirmed => {

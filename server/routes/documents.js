@@ -122,7 +122,7 @@ router.get('/', async (req, res) => {
     let query = '';
     let params = [];
 
-    if (role === 'top management' || user.is_admin) {
+    if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
       // Direktur sees all documents
       query = `
         SELECT d.*, COALESCE(d.sender_division, u.division) AS sender_division
@@ -414,7 +414,7 @@ async function checkDocumentAccess(doc, user) {
   const division = user.division;
   const jabatan = user.jabatan || 'Staff';
 
-  if (role === 'top management' || user.is_admin) {
+  if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
     return true;
   }
 
@@ -610,7 +610,7 @@ router.delete('/:id', async (req, res) => {
     const doc = docResult.rows[0];
 
     // Only owner, top management, or admin can delete
-    if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin) {
+    if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin && user.username !== 'admin' && user.username !== 'administrator') {
       return res.status(403).json({ error: 'Anda tidak memiliki hak untuk menghapus dokumen ini' });
     }
 

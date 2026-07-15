@@ -16,17 +16,25 @@ async function exportData() {
     
     let sql = `-- Migration script for users table\n\n`;
     
+    if (res.rows.length === 0) {
+      console.log('No users found.');
+      process.exit(0);
+    }
+    
+    const columns = Object.keys(res.rows[0]);
+    const columnsStr = columns.join(', ');
+    
     res.rows.forEach(r => {
-      // Escape single quotes in strings
-      const name = r.name ? r.name.replace(/'/g, "''") : '';
-      const username = r.username ? r.username.replace(/'/g, "''") : '';
-      const password = r.password ? r.password.replace(/'/g, "''") : '';
-      const role = r.role ? r.role.replace(/'/g, "''") : '';
-      const department = r.department ? r.department.replace(/'/g, "''") : '';
-      const createdAt = r.created_at ? `'${r.created_at.toISOString()}'` : 'CURRENT_TIMESTAMP';
-      const updatedAt = r.updated_at ? `'${r.updated_at.toISOString()}'` : 'CURRENT_TIMESTAMP';
+      const values = columns.map(col => {
+        const val = r[col];
+        if (val === null || val === undefined) return 'NULL';
+        if (typeof val === 'boolean') return val ? 'true' : 'false';
+        if (val instanceof Date) return `'${val.toISOString()}'`;
+        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+        return `'${val}'`; // fallback
+      });
       
-      sql += `INSERT INTO users (id, username, password, role, department, name, created_at, updated_at) VALUES ('${r.id}', '${username}', '${password}', '${role}', '${department}', '${name}', ${createdAt}, ${updatedAt});\n`;
+      sql += `INSERT INTO users (${columnsStr}) VALUES (${values.join(', ')});\n`;
     });
 
     fs.writeFileSync('migration_users.sql', sql);

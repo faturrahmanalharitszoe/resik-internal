@@ -2,6 +2,11 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+DROP TABLE IF EXISTS room_members CASCADE;
+DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS rooms CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- Users
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -11,6 +16,9 @@ CREATE TABLE users (
   password_hash VARCHAR(255) NOT NULL,
   avatar_url VARCHAR(500),
   division VARCHAR(50) CHECK (division IN ('marketing', 'sdm', 'keuangan', 'operasional')),
+  role VARCHAR(50) DEFAULT 'staff',
+  jabatan VARCHAR(100) DEFAULT 'Staff',
+  is_admin BOOLEAN DEFAULT false,
   is_online BOOLEAN DEFAULT false,
   last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

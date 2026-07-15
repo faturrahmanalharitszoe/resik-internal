@@ -67,12 +67,12 @@ Akses di: **http://localhost:3000**
 - ✅ Online/offline status
 - ✅ Delete pesan
 - ✅ Auto-join ruangan General
+- ✅ File/image & document sharing (Folder Bersama)
+- ✅ Search pesan & filter dokumen
+- ✅ Direct Message (DM) antar user
+- ✅ Read receipts (Status pesan terbaca)
 
 ## Langkah Berikutnya
 
-- [ ] File/image sharing (Multer + MinIO)
 - [ ] Push notifikasi (browser Notification API)
-- [ ] Search pesan
-- [ ] Direct Message (DM) antar user
 - [ ] Upload avatar
-- [ ] Read receipts

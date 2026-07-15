@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 require('dotenv').config();
 const { Pool } = require('pg');
 const http = require('http');
@@ -23,6 +24,7 @@ function request(method, path, headers = {}, body = null) {
       path: url.pathname + url.search,
       headers: {
         'Content-Type': 'application/json',
+        'X-Test-Bypass': 'true',
         ...headers,
       },
     };
@@ -77,6 +79,7 @@ function uploadFile(path, headers = {}, fields = {}, fileContent = 'dummy pdf co
       headers: {
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
         'Content-Length': Buffer.byteLength(body),
+        'X-Test-Bypass': 'true',
         ...headers,
       },
     };
@@ -280,6 +283,105 @@ async function runTests() {
     throw new Error('Wakil Direktur could NOT see the document (top management should see all)');
   }
   console.log('Direktur Umum and Wakil Direktur access verified successfully.');
+
+  // --- ADMIN PANEL API TESTS ---
+  console.log('Starting Admin Panel API tests...');
+
+  // 1. Login as Admin
+  console.log('Logging in as admin...');
+  const loginAdminRes = await request('POST', '/api/auth/login', {}, {
+    username: 'admin',
+    password: 'admin123'
+  });
+  if (loginAdminRes.status !== 200) {
+    throw new Error('Failed to login as admin: ' + JSON.stringify(loginAdminRes.body));
+  }
+  const adminToken = loginAdminRes.body.token;
+  const adminId = loginAdminRes.body.user.id;
+  console.log('Admin logged in successfully.');
+
+  // 2. Verify non-admin is blocked
+  console.log('Verifying non-admin staff token is blocked from admin routes...');
+  const nonAdminGetUsersRes = await request('GET', '/api/admin/users', { Authorization: `Bearer ${staffToken}` });
+  if (nonAdminGetUsersRes.status !== 403) {
+    throw new Error('Expected 403 Forbidden for non-admin on GET /api/admin/users, got ' + nonAdminGetUsersRes.status);
+  }
+  console.log('Non-admin successfully blocked.');
+
+  // 3. Verify admin can list users
+  console.log('Verifying admin can list users...');
+  const adminGetUsersRes = await request('GET', '/api/admin/users', { Authorization: `Bearer ${adminToken}` });
+  if (adminGetUsersRes.status !== 200) {
+    throw new Error('Failed to list users as admin: ' + JSON.stringify(adminGetUsersRes.body));
+  }
+  if (!Array.isArray(adminGetUsersRes.body) || adminGetUsersRes.body.length === 0) {
+    throw new Error('Invalid users list returned: ' + JSON.stringify(adminGetUsersRes.body));
+  }
+  console.log('Admin successfully listed users.');
+
+  // 4. Verify admin can create user
+  console.log('Verifying admin can create user...');
+  const testUsername = 'admin_test_user';
+  const testEmail = 'admin_test_user@example.com';
+  const adminCreateUserRes = await request('POST', '/api/admin/users', { Authorization: `Bearer ${adminToken}` }, {
+    username: testUsername,
+    display_name: 'Admin Test User',
+    email: testEmail,
+    password: 'password123',
+    division: null,
+    role: 'staff',
+    jabatan: 'Staff Testing',
+    is_admin: false
+  });
+  if (adminCreateUserRes.status !== 201) {
+    throw new Error('Admin failed to create user: ' + JSON.stringify(adminCreateUserRes.body));
+  }
+  const createdUserId = adminCreateUserRes.body.id;
+  console.log('User created successfully by admin. ID: ' + createdUserId);
+
+  // 5. Verify admin can edit user
+  console.log('Verifying admin can edit user...');
+  const adminEditUserRes = await request('PUT', `/api/admin/users/${createdUserId}`, { Authorization: `Bearer ${adminToken}` }, {
+    display_name: 'Admin Test User Edited',
+    email: testEmail,
+    division: null,
+    role: 'management',
+    jabatan: 'SM Testing',
+    is_admin: true
+  });
+  if (adminEditUserRes.status !== 200) {
+    throw new Error('Admin failed to edit user: ' + JSON.stringify(adminEditUserRes.body));
+  }
+  if (adminEditUserRes.body.display_name !== 'Admin Test User Edited' || adminEditUserRes.body.is_admin !== true) {
+    throw new Error('Edited user details mismatch: ' + JSON.stringify(adminEditUserRes.body));
+  }
+  console.log('User edited successfully by admin.');
+
+  // 6. Verify admin can reset password
+  console.log('Verifying admin can reset password...');
+  const adminResetPwdRes = await request('PUT', `/api/admin/users/${createdUserId}/password`, { Authorization: `Bearer ${adminToken}` }, {
+    password: 'newpassword123'
+  });
+  if (adminResetPwdRes.status !== 200) {
+    throw new Error('Admin failed to reset password: ' + JSON.stringify(adminResetPwdRes.body));
+  }
+  console.log('Password reset successfully by admin.');
+
+  // 7. Verify admin cannot delete themselves
+  console.log('Verifying admin cannot delete their own account...');
+  const adminDeleteSelfRes = await request('DELETE', `/api/admin/users/${adminId}`, { Authorization: `Bearer ${adminToken}` });
+  if (adminDeleteSelfRes.status !== 400) {
+    throw new Error('Expected 400 Bad Request when deleting self, got ' + adminDeleteSelfRes.status);
+  }
+  console.log('Admin self-deletion blocked successfully.');
+
+  // 8. Verify admin can delete user
+  console.log('Verifying admin can delete user...');
+  const adminDeleteUserRes = await request('DELETE', `/api/admin/users/${createdUserId}`, { Authorization: `Bearer ${adminToken}` });
+  if (adminDeleteUserRes.status !== 200) {
+    throw new Error('Admin failed to delete user: ' + JSON.stringify(adminDeleteUserRes.body));
+  }
+  console.log('User deleted successfully by admin.');
 
   console.log('--- ALL INTEGRATION TESTS PASSED SUCCESSFULLY! ---');
   await pool.end();

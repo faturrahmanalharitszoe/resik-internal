@@ -793,7 +793,18 @@ async function openRoom(room) {
     chatRoomName.textContent = '#' + room.name;
     const memberCount = room.member_count || '...';
     chatMembersCount.textContent = `${memberCount} anggota`;
+
+    // Reset members panel: clear stale data from previous room
+    const membersList = $('members-list');
+    if (membersList) membersList.innerHTML = '';
+
+    // If the panel is currently open, reload members for the new room
+    const membersPanel = $('members-panel');
+    if (membersPanel && !membersPanel.classList.contains('hidden')) {
+      loadRoomMembers(room.id);
+    }
   }
+
 
   emptyState.classList.add('hidden');
   chatView.classList.remove('hidden');

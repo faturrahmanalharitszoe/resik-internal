@@ -1215,7 +1215,13 @@ function initSharingEvents() {
     });
   }
   if ($('filter-year')) {
-    $('filter-year').addEventListener('change', () => {
+    const yearSelect = $('filter-year');
+    const currentYear = new Date().getFullYear();
+    yearSelect.innerHTML = '<option value="all">Semua Tahun</option>';
+    for (let y = currentYear; y >= currentYear - 5; y--) {
+      yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+    }
+    yearSelect.addEventListener('change', () => {
       sharingCurrentPage = 1;
       renderDocumentsTable();
     });

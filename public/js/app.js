@@ -714,7 +714,7 @@ function renderUsers() {
       it: 'IT'
     };
 
-    const divLabel = divisionLabels[user.division] || 'Umum';
+    const divLabel = divisionLabels[user.division] || '';
     const statusDot = user.is_online
       ? '<span class="status-dot online"></span>'
       : '<span class="status-dot offline"></span>';
@@ -733,7 +733,7 @@ function renderUsers() {
           <span class="room-name" style="font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;" title="${esc(toTitleCase(user.display_name))}">${esc(toTitleCase(user.display_name))}</span>
         </div>
         <div class="room-preview-row" style="display: flex; align-items: center; gap: 6px; margin-top: 2px; min-width: 0;">
-          <span class="division-badge ${user.division || ''}" style="font-size: 9px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; line-height: 1.2;" title="Divisi: ${esc(divLabel)}">${esc(divLabel)}</span>
+          ${divLabel ? `<span class="division-badge ${user.division || ''}" style="font-size: 9px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; line-height: 1.2;" title="Divisi: ${esc(divLabel)}">${esc(divLabel)}</span>` : ''}
           <span class="room-preview" style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; flex: 1;" title="${esc(subText)}">${esc(subText)}</span>
         </div>
       </div>

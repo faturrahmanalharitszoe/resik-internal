@@ -2564,8 +2564,7 @@ async function openNotionPage(pageId) {
     $('notion-editor-wrapper').classList.add('hidden');
     $('notion-viewer').classList.remove('hidden');
 
-    const textarea = $('notion-editor');
-    if (textarea) textarea.value = currentNotionPage.content || '';
+    if (tuiEditor) tuiEditor.setMarkdown(currentNotionPage.content || '');
 
     renderMarkdownPreview();
     renderSubpagesList();
@@ -2787,8 +2786,7 @@ function renderMarkdownPreview() {
 
         currentNotionPage.content = lines.join('\n');
 
-        const textarea = $('notion-editor');
-        if (textarea) textarea.value = currentNotionPage.content;
+        if (tuiEditor) tuiEditor.setMarkdown(currentNotionPage.content);
 
         await apiFetch(`/api/notion/pages/${currentNotionPageId}`, {
           method: 'PUT',
@@ -2802,12 +2800,13 @@ function renderMarkdownPreview() {
 }
 window.renderMarkdownPreview = renderMarkdownPreview;
 
+let tuiEditor = null;
+
 async function toggleNotionEditMode() {
   if (!currentNotionPageId) return;
 
   const editBtn = $('btn-notion-edit');
   const cancelBtn = $('btn-notion-cancel');
-  const textarea = $('notion-editor');
   const previewBlock = $('notion-viewer');
   const editorWrapper = $('notion-editor-wrapper');
 
@@ -2818,7 +2817,19 @@ async function toggleNotionEditMode() {
     editorWrapper.classList.remove('hidden');
     previewBlock.classList.add('hidden');
     renderNotionPageAccess();
-    if (textarea) textarea.focus();
+
+    if (!tuiEditor) {
+      tuiEditor = new toastui.Editor({
+        el: document.querySelector('#notion-tui-editor'),
+        height: '400px',
+        initialEditType: 'wysiwyg',
+        previewStyle: 'vertical',
+        initialValue: currentNotionPage.content || ''
+      });
+    } else {
+      tuiEditor.setMarkdown(currentNotionPage.content || '');
+    }
+    
   } else {
     notionEditMode = false;
     editBtn.textContent = 'Edit';
@@ -2826,7 +2837,7 @@ async function toggleNotionEditMode() {
     editorWrapper.classList.add('hidden');
     previewBlock.classList.remove('hidden');
 
-    const updatedContent = textarea ? textarea.value : '';
+    const updatedContent = tuiEditor ? tuiEditor.getMarkdown() : '';
     currentNotionPage.content = updatedContent;
 
     const canEditAccess = true;
@@ -2869,7 +2880,6 @@ function cancelNotionEdit() {
 
   const editBtn = $('btn-notion-edit');
   const cancelBtn = $('btn-notion-cancel');
-  const textarea = $('notion-editor');
   const previewBlock = $('notion-viewer');
   const editorWrapper = $('notion-editor-wrapper');
 
@@ -2878,7 +2888,7 @@ function cancelNotionEdit() {
   if (editorWrapper) editorWrapper.classList.add('hidden');
   if (previewBlock) previewBlock.classList.remove('hidden');
 
-  if (textarea) textarea.value = currentNotionPage.content || '';
+  if (tuiEditor) tuiEditor.setMarkdown(currentNotionPage.content || '');
   renderMarkdownPreview();
   renderNotionPageAccess();
 }
@@ -3183,58 +3193,7 @@ async function selectEmoji(emoji) {
 }
 window.selectEmoji = selectEmoji;
 
-function insertEditorTag(tag) {
-  const textarea = $('notion-editor');
-  if (!textarea) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-  const selectedText = text.substring(start, end);
-
-  let replacement = '';
-  switch (tag) {
-    case 'bold':
-      replacement = `**${selectedText || 'tebal'}**`;
-      break;
-    case 'italic':
-      replacement = `*${selectedText || 'miring'}*`;
-      break;
-    case 'code':
-      replacement = `\`${selectedText || 'code'}\``;
-      break;
-    case 'h1':
-      replacement = `\n# ${selectedText || 'Judul 1'}\n`;
-      break;
-    case 'h2':
-      replacement = `\n## ${selectedText || 'Judul 2'}\n`;
-      break;
-    case 'h3':
-      replacement = `\n### ${selectedText || 'Judul 3'}\n`;
-      break;
-    case 'bullet':
-      replacement = `\n- ${selectedText || 'Item daftar'}`;
-      break;
-    case 'todo':
-      replacement = `\n- [ ] ${selectedText || 'Tugas baru'}`;
-      break;
-    case 'codeblock':
-      replacement = `\n\`\`\`javascript\n${selectedText || '// tulis kode di sini'}\n\`\`\`\n`;
-      break;
-    case 'image':
-      replacement = `\n![](https://picsum.photos/400/300)\n`;
-      break;
-    case 'video':
-      replacement = `\n@[video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n`;
-      break;
-  }
-
-  textarea.value = text.substring(0, start) + replacement + text.substring(end);
-  textarea.focus();
-  textarea.selectionStart = start + replacement.length;
-  textarea.selectionEnd = start + replacement.length;
-}
-window.insertEditorTag = insertEditorTag;
+// Fungsi insertEditorTag dihapus karena menggunakan TUI Editor.
 
 async function switchDbView(viewName) {
   if (!currentNotionPageId) return;

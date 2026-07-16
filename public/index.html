@@ -485,15 +485,15 @@
             </div>
           <div id="notion-editor-wrapper" class="notion-editor-wrapper hidden">
             <div class="editor-toolbar">
-              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('#')" title="Heading">H</button>
-              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('-')" title="List">•</button>
-              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('**')" title="Bold"><b>B</b></button>
-              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('*')" title="Italic"><i>I</i></button>
+              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('h1')" title="Heading">H</button>
+              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('bullet')" title="List">•</button>
+              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('bold')" title="Bold"><b>B</b></button>
+              <button type="button" class="editor-tool-btn" onclick="insertEditorTag('italic')" title="Italic"><i>I</i></button>
             </div>
             <textarea id="notion-editor" class="notion-editor-textarea" placeholder="Tulis sesuatu..."></textarea>
             <div style="display: flex; gap: 8px; margin-top: 8px;">
-              <button id="btn-notion-save" class="btn-primary-sm">Simpan</button>
-              <button id="btn-notion-cancel" class="btn-secondary-sm">Batal</button>
+              <button id="btn-notion-save" class="btn-primary-sm" onclick="toggleNotionEditMode()">Simpan</button>
+              <button id="btn-notion-cancel" class="btn-secondary-sm" onclick="cancelNotionEdit()">Batal</button>
             </div>
           </div>
           <div id="notion-viewer" class="notion-viewer">

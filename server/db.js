@@ -21,8 +21,16 @@ async function runMigrations() {
     // 1. Add division column if it doesn't exist
     await pool.query(`
       ALTER TABLE users 
-      ADD COLUMN IF NOT EXISTS division VARCHAR(50) 
-      CHECK (division IN ('marketing', 'sdm', 'keuangan', 'operasional'));
+      ADD COLUMN IF NOT EXISTS division VARCHAR(50);
+    `);
+
+    // Drop and re-add division constraint to ensure 'it' is included
+    await pool.query(`
+      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_division_check;
+    `);
+    await pool.query(`
+      ALTER TABLE users ADD CONSTRAINT users_division_check
+      CHECK (division IN ('marketing', 'sdm', 'keuangan', 'operasional', 'it'));
     `);
 
     // 2. Add role column if it doesn't exist
@@ -52,7 +60,7 @@ async function runMigrations() {
     `);
 
     // 4. Ensure default group rooms exist
-    const defaultRooms = ['General', 'Marketing', 'SDM', 'Keuangan', 'Operasional'];
+    const defaultRooms = ['General', 'Marketing', 'SDM', 'Keuangan', 'Operasional', 'IT'];
     for (const name of defaultRooms) {
       const exists = await pool.query(
         "SELECT id FROM rooms WHERE name = $1 AND type = 'group' LIMIT 1",
@@ -66,6 +74,51 @@ async function runMigrations() {
         console.log(`✅ Room default dibuat: ${name}`);
       }
     }
+
+    // 4b. Auto-join ALL existing users into General room (fix for users not in General)
+    const generalRoomRes = await pool.query(
+      "SELECT id FROM rooms WHERE name = 'General' AND type = 'group' LIMIT 1"
+    );
+    if (generalRoomRes.rows.length > 0) {
+      const generalRoomId = generalRoomRes.rows[0].id;
+      await pool.query(`
+        INSERT INTO room_members (room_id, user_id)
+        SELECT $1, u.id FROM users u
+        WHERE NOT EXISTS (
+          SELECT 1 FROM room_members rm
+          WHERE rm.room_id = $1 AND rm.user_id = u.id
+        )
+      `, [generalRoomId]);
+      console.log('✅ Semua user yang belum ada di General room sudah ditambahkan.');
+    }
+
+    // 4c. Auto-join existing users into their division rooms
+    const divisionRoomMap = {
+      marketing: 'Marketing',
+      sdm: 'SDM',
+      keuangan: 'Keuangan',
+      operasional: 'Operasional',
+      it: 'IT'
+    };
+    for (const [divKey, divRoomName] of Object.entries(divisionRoomMap)) {
+      const divRoomRes = await pool.query(
+        "SELECT id FROM rooms WHERE name = $1 AND type = 'group' LIMIT 1",
+        [divRoomName]
+      );
+      if (divRoomRes.rows.length > 0) {
+        const divRoomId = divRoomRes.rows[0].id;
+        await pool.query(`
+          INSERT INTO room_members (room_id, user_id)
+          SELECT $1, u.id FROM users u
+          WHERE u.division = $2
+          AND NOT EXISTS (
+            SELECT 1 FROM room_members rm
+            WHERE rm.room_id = $1 AND rm.user_id = u.id
+          )
+        `, [divRoomId, divKey]);
+      }
+    }
+    console.log('✅ Auto-join divisi selesai.');
 
     // 5. Create projects table
     await pool.query(`

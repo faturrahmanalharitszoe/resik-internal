@@ -2369,18 +2369,65 @@ async function createNewNotionPage(event) {
     console.error("Gagal membuat halaman Notion:", err);
   }
 }
-window.createNewNotionPage = createNewNotionPage;
+
+function showNotionTypeDialog(pageTitle) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-dialog-overlay';
+    overlay.innerHTML = `
+      <div class="custom-dialog-modal" style="min-width: 350px;">
+        <div class="custom-dialog-header">
+          <span class="custom-dialog-icon">📄</span>
+          <span class="custom-dialog-title">Tipe Halaman: ${esc(pageTitle)}</span>
+        </div>
+        <div class="custom-dialog-body" style="display: flex; flex-direction: column; gap: 10px;">
+          <p style="margin:0; font-size:13px; color:var(--text-muted);">Pilih tipe halaman yang ingin dibuat:</p>
+          
+          <button id="btn-type-wiki" class="btn-secondary" style="display:flex; flex-direction:column; align-items:flex-start; padding: 12px; text-align: left; height: auto;">
+            <div style="font-weight:600; margin-bottom:4px;">📄 Halaman Wiki / Catatan</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:normal; white-space:normal;">Halaman kosong biasa untuk menulis dokumen, wiki, atau panduan.</div>
+          </button>
+          
+          <button id="btn-type-db" class="btn-secondary" style="display:flex; flex-direction:column; align-items:flex-start; padding: 12px; text-align: left; height: auto;">
+            <div style="font-weight:600; margin-bottom:4px;">📅 Database (Tabel/Kalender)</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:normal; white-space:normal;">Halaman terstruktur seperti To-Do list, Kanban, atau Kalender.</div>
+          </button>
+        </div>
+        <div class="custom-dialog-footer">
+          <button class="btn-secondary-sm" id="btn-type-cancel">Batal</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const btnWiki = overlay.querySelector('#btn-type-wiki');
+    const btnDb = overlay.querySelector('#btn-type-db');
+    const btnCancel = overlay.querySelector('#btn-type-cancel');
+
+    btnWiki.onclick = () => { overlay.remove(); resolve({ isDb: false }); };
+    btnDb.onclick = () => { overlay.remove(); resolve({ isDb: true }); };
+    btnCancel.onclick = () => { overlay.remove(); resolve(null); };
+  });
+}
+
+window.createNewNotionPage = async function() {
+  currentNotionPageId = null; 
+  await addSubpageToCurrent();
+};
 
 async function addSubpageToCurrent() {
   const isSubpage = !!currentNotionPageId;
   const promptMsg = isSubpage
     ? "Masukkan judul sub-halaman baru:"
-    : "Masukkan judul halaman baru:";
+    : "Masukkan judul halaman baru (Root):";
   const title = await showCustomPrompt(promptMsg);
   if (title === null) return;
   const pageTitle = title.trim() || "Tanpa Judul";
 
-  const isDb = await showCustomConfirm("Apakah Anda ingin membuat halaman ini sebagai Database?\n\n(Klik 'OK' untuk Database, 'Batal' untuk Wiki/Catatan biasa)");
+  const typeChoice = await showNotionTypeDialog(pageTitle);
+  if (!typeChoice) return; // Dibatalkan oleh user
+  
+  const isDb = typeChoice.isDb;
 
   try {
     const pageData = {

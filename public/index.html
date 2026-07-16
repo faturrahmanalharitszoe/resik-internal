@@ -185,9 +185,13 @@
       </div>
 
       <div class="sidebar-section notion-section">
-        <div class="section-label" id="toggle-notion-btn" onclick="toggleNotionCollapse()" data-label="Notion">
+        <div class="section-label" id="toggle-notion-btn" data-label="Notion">
           <span>📄 Notion</span>
-          <span class="collapse-chevron">▼</span>
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 4px;">
+            <button id="btn-new-notion-root" class="icon-btn" title="Buat Halaman Root Baru"
+              style="font-size: 16px; line-height: 1;" onclick="createNewNotionPage()">+</button>
+            <span class="collapse-chevron" onclick="toggleNotionCollapse()" style="cursor: pointer;">▼</span>
+          </div>
         </div>
         <ul id="notion-page-list" class="room-list notion-tree-list">
           <li id="btn-notion-calendar" class="room-item notion-special-item" onclick="switchToNotionCalendar()">

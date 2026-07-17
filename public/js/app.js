@@ -2565,7 +2565,7 @@ async function openNotionPage(pageId) {
     $('notion-viewer').classList.remove('hidden');
 
     if (summernoteInitialized) {
-      $('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
+      jQuery('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
     }
 
     renderMarkdownPreview();
@@ -2789,7 +2789,7 @@ function renderMarkdownPreview() {
         currentNotionPage.content = lines.join('\n');
 
         if (summernoteInitialized) {
-          $('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
+          jQuery('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
         }
 
         await apiFetch(`/api/notion/pages/${currentNotionPageId}`, {
@@ -2833,7 +2833,7 @@ async function toggleNotionEditMode() {
     const htmlContent = ensureHtml(currentNotionPage.content);
 
     if (!summernoteInitialized) {
-      $('#notion-summernote').summernote({
+      jQuery('#notion-summernote').summernote({
         height: 400,
         toolbar: [
           ['style', ['style']],
@@ -2850,7 +2850,7 @@ async function toggleNotionEditMode() {
       summernoteInitialized = true;
     }
     
-    $('#notion-summernote').summernote('code', htmlContent);
+    jQuery('#notion-summernote').summernote('code', htmlContent);
     
   } else {
     notionEditMode = false;
@@ -2859,7 +2859,7 @@ async function toggleNotionEditMode() {
     editorWrapper.classList.add('hidden');
     previewBlock.classList.remove('hidden');
 
-    const updatedContent = summernoteInitialized ? $('#notion-summernote').summernote('code') : '';
+    const updatedContent = summernoteInitialized ? jQuery('#notion-summernote').summernote('code') : '';
     currentNotionPage.content = updatedContent;
 
     const canEditAccess = true;
@@ -2911,7 +2911,7 @@ function cancelNotionEdit() {
   if (previewBlock) previewBlock.classList.remove('hidden');
 
   if (summernoteInitialized) {
-    $('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
+    jQuery('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
   }
   renderMarkdownPreview();
   renderNotionPageAccess();

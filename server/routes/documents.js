@@ -73,30 +73,98 @@ router.get('/counts', async (req, res) => {
   try {
     const user = req.user;
     const displayName = user.display_name;
+    const role = user.role || 'staff';
+    const division = user.division;
+    const jabatan = user.jabatan || 'Staff';
 
-    // Sent total
-    const totalOut = await db.query(
-      'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1',
-      [displayName]
-    );
+    let totalInQuery = '';
+    let todayInQuery = '';
+    let totalOutQuery = '';
+    let todayOutQuery = '';
+    let paramsIn = [];
+    let paramsOut = [displayName];
 
-    // Sent today
-    const todayOut = await db.query(
-      "SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 AND tgl >= CURRENT_DATE",
-      [displayName]
-    );
+    // For OUT, it's documents sent by the user
+    totalOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1';
+    todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 AND tgl >= CURRENT_DATE';
 
-    // Received total
-    const totalIn = await db.query(
-      "SELECT COUNT(*) FROM shared_documents WHERE $1 = ANY(string_to_array(penerima, ','))",
-      [displayName]
-    );
+    if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
+      totalInQuery = 'SELECT COUNT(*) FROM shared_documents';
+      todayInQuery = 'SELECT COUNT(*) FROM shared_documents WHERE tgl >= CURRENT_DATE';
+      paramsIn = [];
+    } else if (role === 'management' && (jabatan === 'SM' || jabatan === 'Senior Manager')) {
+      let targetDivisions = [division];
+      let subDivs = [];
+      if (division === 'keuangan') subDivs = ['Payment', 'Payroll', 'IT', 'Keuangan', 'Accounting'];
+      else if (division === 'sdm') subDivs = ['SDM', 'GA'];
+      else if (division === 'operasional') subDivs = ['OPS', 'Pengadaan', 'operasional'];
+      else if (division === 'marketing') subDivs = ['marketing'];
 
-    // Received today
-    const todayIn = await db.query(
-      "SELECT COUNT(*) FROM shared_documents WHERE $1 = ANY(string_to_array(penerima, ',')) AND tgl >= CURRENT_DATE",
-      [displayName]
-    );
+      totalInQuery = `
+        SELECT COUNT(DISTINCT d.id) FROM shared_documents d
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE d.sender_division = $1 OR u.division = $1
+           OR EXISTS (
+             SELECT 1 FROM users u2 WHERE u2.division = $1 AND u2.display_name = ANY(string_to_array(d.penerima, ','))
+           )
+           OR EXISTS (
+             SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($2::text[])
+           )
+      `;
+      todayInQuery = `
+        SELECT COUNT(DISTINCT d.id) FROM shared_documents d
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE (d.sender_division = $1 OR u.division = $1
+           OR EXISTS (
+             SELECT 1 FROM users u2 WHERE u2.division = $1 AND u2.display_name = ANY(string_to_array(d.penerima, ','))
+           )
+           OR EXISTS (
+             SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($2::text[])
+           )) AND d.tgl >= CURRENT_DATE
+      `;
+      paramsIn = [division, [...subDivs, division]];
+    } else {
+      const userGroups = [displayName];
+      const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' };
+      const mappedDiv = divisionLabels[division] || division;
+      const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
+      const userLevel = jabatanHierarchy.indexOf(jabatan);
+
+      if (mappedDiv) {
+        userGroups.push('Divisi ' + mappedDiv);
+        if (jabatan) userGroups.push(jabatan + ' ' + mappedDiv);
+        if (userLevel > 0) {
+          jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
+            userGroups.push(lowerJab + ' ' + mappedDiv);
+          });
+        }
+      }
+
+      if (jabatan === 'Direktur Umum') userGroups.push('Direktur Umum');
+      else if (jabatan === 'Wakil Direktur' || jabatan === 'Wakil Direktur Utama') { userGroups.push('Wakil Direktur', 'Wakil Direktur Utama'); }
+      else if (jabatan === 'Direktur') userGroups.push('Direktur');
+      else if (jabatan === 'SM' || jabatan === 'Senior Manager') { userGroups.push('Semua SM', 'Semua Senior Manager'); }
+      else if (jabatan === 'Staff') userGroups.push('Semua Staff');
+
+      totalInQuery = `
+        SELECT COUNT(*) FROM shared_documents d
+        WHERE EXISTS (
+          SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($1::text[])
+        )
+      `;
+      todayInQuery = `
+        SELECT COUNT(*) FROM shared_documents d
+        WHERE EXISTS (
+          SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($1::text[])
+        ) AND d.tgl >= CURRENT_DATE
+      `;
+      paramsIn = [userGroups];
+    }
+
+    const totalOut = await db.query(totalOutQuery, paramsOut);
+    const todayOut = await db.query(todayOutQuery, paramsOut);
+    const totalIn = await db.query(totalInQuery, paramsIn);
+    const todayIn = await db.query(todayInQuery, paramsIn);
 
     res.json({
       todayInCount: parseInt(todayIn.rows[0].count, 10),

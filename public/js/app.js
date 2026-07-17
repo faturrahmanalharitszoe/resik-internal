@@ -2564,7 +2564,9 @@ async function openNotionPage(pageId) {
     $('notion-editor-wrapper').classList.add('hidden');
     $('notion-viewer').classList.remove('hidden');
 
-    if (tuiEditor) tuiEditor.setMarkdown(currentNotionPage.content || '');
+    if (summernoteInitialized) {
+      $('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
+    }
 
     renderMarkdownPreview();
     renderSubpagesList();
@@ -2769,7 +2771,7 @@ function renderMarkdownPreview() {
   const previewArea = $('notion-rendered-content');
   if (!previewArea || !currentNotionPage) return;
 
-  previewArea.innerHTML = parseMarkdown(currentNotionPage.content);
+  previewArea.innerHTML = ensureHtml(currentNotionPage.content);
 
   previewArea.querySelectorAll('.notion-todo-checkbox').forEach(cb => {
     cb.addEventListener('change', async () => {
@@ -2786,7 +2788,9 @@ function renderMarkdownPreview() {
 
         currentNotionPage.content = lines.join('\n');
 
-        if (tuiEditor) tuiEditor.setMarkdown(currentNotionPage.content);
+        if (summernoteInitialized) {
+          $('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
+        }
 
         await apiFetch(`/api/notion/pages/${currentNotionPageId}`, {
           method: 'PUT',
@@ -2800,7 +2804,15 @@ function renderMarkdownPreview() {
 }
 window.renderMarkdownPreview = renderMarkdownPreview;
 
-let tuiEditor = null;
+function ensureHtml(content) {
+  if (!content) return '';
+  if (/<(p|h[1-6]|ul|ol|li|blockquote|div|span|table|pre|b|i|strong|em|u)[>\s]/i.test(content)) {
+    return content;
+  }
+  return parseMarkdown(content);
+}
+
+let summernoteInitialized = false;
 
 async function toggleNotionEditMode() {
   if (!currentNotionPageId) return;
@@ -2818,17 +2830,27 @@ async function toggleNotionEditMode() {
     previewBlock.classList.add('hidden');
     renderNotionPageAccess();
 
-    if (!tuiEditor) {
-      tuiEditor = new toastui.Editor({
-        el: document.querySelector('#notion-tui-editor'),
-        height: '400px',
-        initialEditType: 'wysiwyg',
-        previewStyle: 'vertical',
-        initialValue: currentNotionPage.content || ''
+    const htmlContent = ensureHtml(currentNotionPage.content);
+
+    if (!summernoteInitialized) {
+      $('#notion-summernote').summernote({
+        height: 400,
+        toolbar: [
+          ['style', ['style']],
+          ['font', ['bold', 'underline', 'clear']],
+          ['fontname', ['fontname']],
+          ['fontsize', ['fontsize']],
+          ['color', ['color']],
+          ['para', ['ul', 'ol', 'paragraph']],
+          ['table', ['table']],
+          ['insert', ['link', 'picture', 'video']],
+          ['view', ['fullscreen', 'codeview', 'help']]
+        ]
       });
-    } else {
-      tuiEditor.setMarkdown(currentNotionPage.content || '');
+      summernoteInitialized = true;
     }
+    
+    $('#notion-summernote').summernote('code', htmlContent);
     
   } else {
     notionEditMode = false;
@@ -2837,7 +2859,7 @@ async function toggleNotionEditMode() {
     editorWrapper.classList.add('hidden');
     previewBlock.classList.remove('hidden');
 
-    const updatedContent = tuiEditor ? tuiEditor.getMarkdown() : '';
+    const updatedContent = summernoteInitialized ? $('#notion-summernote').summernote('code') : '';
     currentNotionPage.content = updatedContent;
 
     const canEditAccess = true;
@@ -2888,7 +2910,9 @@ function cancelNotionEdit() {
   if (editorWrapper) editorWrapper.classList.add('hidden');
   if (previewBlock) previewBlock.classList.remove('hidden');
 
-  if (tuiEditor) tuiEditor.setMarkdown(currentNotionPage.content || '');
+  if (summernoteInitialized) {
+    $('#notion-summernote').summernote('code', ensureHtml(currentNotionPage.content));
+  }
   renderMarkdownPreview();
   renderNotionPageAccess();
 }

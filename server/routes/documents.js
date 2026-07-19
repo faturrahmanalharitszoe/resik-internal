@@ -84,9 +84,23 @@ router.get('/counts', async (req, res) => {
     let paramsIn = [];
     let paramsOut = [displayName];
 
-    // For OUT, it's documents sent by the user
-    totalOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1';
-    todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 AND tgl >= CURRENT_DATE';
+    // For OUT: mirror the frontend "keluar" tab logic
+    if (role === 'top management') {
+      // Top management doesn't use "keluar" tab (uses "semua" instead), so keluar count = 0
+      totalOutQuery = 'SELECT 0 AS count';
+      todayOutQuery = 'SELECT 0 AS count';
+      paramsOut = [];
+    } else if (role === 'management' && (jabatan === 'SM' || jabatan === 'Senior Manager')) {
+      // Management sees own docs + docs from their division
+      totalOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 OR sender_division = $2';
+      todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE (sender_name = $1 OR sender_division = $2) AND tgl >= CURRENT_DATE';
+      paramsOut = [displayName, division];
+    } else {
+      // Staff only sees their own docs
+      totalOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1';
+      todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 AND tgl >= CURRENT_DATE';
+      paramsOut = [displayName];
+    }
 
     if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
       totalInQuery = 'SELECT COUNT(*) FROM shared_documents';

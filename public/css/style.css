@@ -1022,7 +1022,7 @@ body {
 }
 
 .sharing-cover {
-  height: 140px;
+  height: 90px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
@@ -1036,7 +1036,7 @@ html[data-theme="dark"] .sharing-cover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 28px;
+  padding: 0 20px;
   background: linear-gradient(to right, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.1) 100%);
 }
 
@@ -1047,21 +1047,21 @@ html[data-theme="dark"] .sharing-cover {
 }
 
 .sharing-cover-icon {
-  font-size: 36px;
+  font-size: 26px;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
 }
 
 .sharing-cover-heading {
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .sharing-cover-sub {
-  font-size: 13px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .btn-upload-hero {
@@ -1150,11 +1150,11 @@ html[data-theme="dark"] .sharing-cover {
 }
 
 .sf-stat-in-total {
-  border-top: 3px solid #f59e0b;
+  border-top: 3px solid #22c55e;
 }
 
 .sf-stat-out-total {
-  border-top: 3px solid #ef4444;
+  border-top: 3px solid #3b82f6;
 }
 
 /* ── Main Card ── */
@@ -1391,6 +1391,225 @@ html[data-theme="dark"] .sf-main-card {
   gap: 4px;
 }
 
+/* ── Recipients "+N more" popover ── */
+.sf-recipient-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  min-width: 24px;
+  background: var(--bg-hover);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s;
+}
+
+.sf-recipient-more:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sf-recipient-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  z-index: 100;
+  transition: opacity 0.15s, visibility 0.15s;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.sf-recipient-more:hover .sf-recipient-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ── Sortable headers ── */
+.sf-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+  position: relative;
+}
+
+.sf-table th.sortable:hover {
+  color: var(--accent);
+}
+
+.sf-table th .sort-indicator {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.sf-table th.sortable:hover .sort-indicator {
+  opacity: 1;
+}
+
+.sf-table th .sort-indicator.active {
+  opacity: 1;
+  color: var(--accent);
+}
+
+/* ── Row checkbox ── */
+.sf-checkbox-cell {
+  width: 40px;
+  padding: 8px 4px !important;
+  text-align: center;
+}
+
+.sf-checkbox-cell input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* ── Bulk action bar ── */
+.sf-bulk-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.sf-bulk-bar.active {
+  display: flex;
+}
+
+.sf-bulk-bar .sf-bulk-count {
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-right: 12px;
+}
+
+.sf-bulk-bar .btn-bulk-action {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sf-bulk-bar .btn-bulk-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ── New action button variants ── */
+.btn-action.download-btn {
+  border-color: rgba(62, 207, 142, 0.25);
+  color: var(--online);
+}
+
+.btn-action.download-btn:hover {
+  background: rgba(62, 207, 142, 0.1);
+  border-color: var(--online);
+}
+
+.btn-action.forward-btn {
+  border-color: rgba(250, 176, 5, 0.25);
+  color: #f59e0b;
+}
+
+.btn-action.forward-btn:hover {
+  background: rgba(250, 176, 5, 0.1);
+  border-color: #f59e0b;
+}
+
+.btn-action.archive-btn {
+  border-color: rgba(139, 92, 246, 0.25);
+  color: #8b5cf6;
+}
+
+.btn-action.archive-btn:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: #8b5cf6;
+}
+
+/* ── Division badge legend ── */
+.sf-legend-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sf-legend-trigger {
+  position: relative;
+  display: inline-flex;
+  cursor: help;
+  color: var(--text-muted);
+  font-size: 16px;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.sf-legend-trigger:hover .sf-legend-popup {
+  visibility: visible;
+  opacity: 1;
+}
+
+.sf-legend-popup {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  z-index: 100;
+  transition: opacity 0.15s, visibility 0.15s;
+  pointer-events: none;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.sf-legend-popup-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.sf-legend-popup-item .legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* Actions cell */
 .sf-td-actions {
   white-space: nowrap;
@@ -1573,7 +1792,7 @@ html[data-theme="dark"] .sf-main-card {
 
 .msg-kebab-btn:hover {
   opacity: 1;
-  background: rgba(0,0,0,0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .msg-menu {
@@ -1582,7 +1801,7 @@ html[data-theme="dark"] .sf-main-card {
   right: 0;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border-radius: var(--radius-md);
   padding: 4px;
   z-index: 100;
@@ -1604,7 +1823,7 @@ html[data-theme="dark"] .sf-main-card {
 }
 
 .msg-menu-item:hover {
-  background: rgba(0,0,0,0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .msg-menu-item.delete {

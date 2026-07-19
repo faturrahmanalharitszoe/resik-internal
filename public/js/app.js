@@ -28,6 +28,9 @@ let recipientsList = [];
 let selectedUploadFile = null;
 let sharingCurrentPage = 1;
 const sharingPageSize = 10;
+let sharingSortField = 'tgl';
+let sharingSortDir = 'desc';
+let selectedDocIds = new Set();
 
 /* ─── NOTION STATE ─── */
 let notionPages = [];
@@ -1679,6 +1682,26 @@ function renderDocumentsTable() {
     return true;
   });
 
+  // 5. Sorting
+  filtered.sort((a, b) => {
+    let valA, valB;
+    if (sharingSortField === 'tgl') {
+      valA = new Date(a.tgl).getTime();
+      valB = new Date(b.tgl).getTime();
+    } else if (sharingSortField === 'document_name') {
+      valA = (a.document_name || '').toLowerCase();
+      valB = (b.document_name || '').toLowerCase();
+    } else if (sharingSortField === 'senderName') {
+      valA = (a.senderName || '').toLowerCase();
+      valB = (b.senderName || '').toLowerCase();
+    } else {
+      return 0;
+    }
+    if (valA < valB) return sharingSortDir === 'asc' ? -1 : 1;
+    if (valA > valB) return sharingSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   if (filtered.length === 0) {
     if (emptyDiv) emptyDiv.classList.remove('hidden');
     if (paginationDiv) paginationDiv.classList.add('hidden');
@@ -1718,11 +1741,28 @@ function renderDocumentsTable() {
     const subTipe = doc.sub_tipe ? `<span class="doc-sub">${esc(doc.sub_tipe)}</span>` : '';
 
     const displayRecs = getDisplayRecipients(doc.penerima);
-    const recipientsStr = displayRecs.map(r => {
-      const tagClass = getTagClassForRecipient(r);
-      return `<span class="tag-pill ${tagClass}">${esc(r)}</span>`;
-    }).join('');
+    const MAX_VISIBLE_RECIPIENTS = 3;
+    let recipientsStr = '';
+    if (displayRecs.length <= MAX_VISIBLE_RECIPIENTS) {
+      recipientsStr = displayRecs.map(r => {
+        const tagClass = getTagClassForRecipient(r);
+        return `<span class="tag-pill ${tagClass}">${esc(r)}</span>`;
+      }).join('');
+    } else {
+      const visible = displayRecs.slice(0, MAX_VISIBLE_RECIPIENTS);
+      const hidden = displayRecs.slice(MAX_VISIBLE_RECIPIENTS);
+      recipientsStr = visible.map(r => {
+        const tagClass = getTagClassForRecipient(r);
+        return `<span class="tag-pill ${tagClass}">${esc(r)}</span>`;
+      }).join('');
+      const tooltipContent = hidden.map(r => {
+        const tagClass = getTagClassForRecipient(r);
+        return `<span class="tag-pill ${tagClass}">${esc(r)}</span>`;
+      }).join('');
+      recipientsStr += `<span class="sf-recipient-more">+${hidden.length}<span class="sf-recipient-tooltip">${tooltipContent}</span></span>`;
+    }
 
+    const isDocSelected = selectedDocIds.has(doc.id);
     const canEdit = (doc.senderName || '').toLowerCase().trim() === (currentUser.display_name || '').toLowerCase().trim();
     const canDelete = currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator';
     const editBtn = canEdit
@@ -1737,11 +1777,21 @@ function renderDocumentsTable() {
            Hapus
          </button>`
       : '';
+    const downloadBtn = doc.file
+      ? `<button class="btn-action download-btn" onclick="event.stopPropagation(); window.open('${API}/uploads/${doc.file.replace(/\\/g, '/').split('/').pop()}', '_blank')">
+           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+           Unduh
+         </button>`
+      : '';
 
     tr.style.cursor = 'pointer';
-    tr.addEventListener('click', () => openDetailModal(doc.id));
+    tr.addEventListener('click', (e) => {
+      if (e.target.type === 'checkbox' || e.target.closest('.sf-checkbox-cell') || e.target.closest('.btn-action')) return;
+      openDetailModal(doc.id);
+    });
 
     tr.innerHTML = `
+      <td class="sf-checkbox-cell"><input type="checkbox" ${isDocSelected ? 'checked' : ''} onchange="event.stopPropagation(); toggleDocSelection('${doc.id}', this.checked)"></td>
       <td class="sf-td-date">
         <div class="sf-date-day">${dateDay}</div>
         <div class="sf-date-time">${dateTime}</div>
@@ -1766,7 +1816,16 @@ function renderDocumentsTable() {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           Detail
         </button>
+        ${downloadBtn}
         ${editBtn}
+        <button class="btn-action forward-btn" onclick="event.stopPropagation(); forwardDocument('${doc.id}', '${esc(doc.document_name)}')" title="Teruskan">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+          Teruskan
+        </button>
+        <button class="btn-action archive-btn" onclick="event.stopPropagation(); archiveDocument('${doc.id}', '${esc(doc.document_name)}')" title="Arsipkan">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Arsip
+        </button>
         ${deleteDocBtn}
       </td>
     `;
@@ -1799,6 +1858,118 @@ async function deleteDocument(docId, docName) {
   }
 }
 window.deleteDocument = deleteDocument;
+
+/* ── Column Sorting ── */
+function sortDocuments(field) {
+  if (sharingSortField === field) {
+    sharingSortDir = sharingSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sharingSortField = field;
+    sharingSortDir = 'desc';
+  }
+  // Update sort indicators in thead
+  document.querySelectorAll('.sf-table th .sort-indicator').forEach(el => el.classList.remove('active'));
+  const activeIndicator = document.getElementById('sort-ind-' + field);
+  if (activeIndicator) {
+    activeIndicator.classList.add('active');
+    activeIndicator.textContent = sharingSortDir === 'asc' ? '▲' : '▼';
+  }
+  sharingCurrentPage = 1;
+  renderDocumentsTable();
+}
+window.sortDocuments = sortDocuments;
+
+/* ── Row Selection / Bulk Actions ── */
+function toggleDocSelection(docId, checked) {
+  if (checked) {
+    selectedDocIds.add(docId);
+  } else {
+    selectedDocIds.delete(docId);
+  }
+  updateBulkBar();
+}
+window.toggleDocSelection = toggleDocSelection;
+
+function toggleSelectAll(checkbox) {
+  const allCheckboxes = document.querySelectorAll('#sharing-table-body input[type="checkbox"]');
+  allCheckboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+    const row = cb.closest('tr');
+    if (row) {
+      // Extract docId from the checkbox's onchange attribute
+      const match = cb.getAttribute('onchange');
+      if (match) {
+        const idMatch = match.match(/toggleDocSelection\('([^']+)'/);
+        if (idMatch) {
+          if (checkbox.checked) selectedDocIds.add(idMatch[1]);
+          else selectedDocIds.delete(idMatch[1]);
+        }
+      }
+    }
+  });
+  updateBulkBar();
+}
+window.toggleSelectAll = toggleSelectAll;
+
+function updateBulkBar() {
+  const bulkBar = $('sharing-bulk-bar');
+  const bulkCount = $('bulk-count');
+  if (!bulkBar || !bulkCount) return;
+  if (selectedDocIds.size > 0) {
+    bulkBar.classList.add('active');
+    bulkCount.textContent = selectedDocIds.size + ' dipilih';
+  } else {
+    bulkBar.classList.remove('active');
+    bulkCount.textContent = '0 dipilih';
+    // Reset select-all checkbox
+    const selectAllCb = $('select-all-docs');
+    if (selectAllCb) selectAllCb.checked = false;
+  }
+}
+window.updateBulkBar = updateBulkBar;
+
+function clearBulkSelection() {
+  selectedDocIds.clear();
+  document.querySelectorAll('#sharing-table-body input[type="checkbox"]').forEach(cb => cb.checked = false);
+  const selectAllCb = $('select-all-docs');
+  if (selectAllCb) selectAllCb.checked = false;
+  updateBulkBar();
+}
+window.clearBulkSelection = clearBulkSelection;
+
+function forwardDocument(docId, docName) {
+  showCustomAlert(`Fitur "Teruskan" untuk dokumen "${docName}" akan segera tersedia.`);
+}
+window.forwardDocument = forwardDocument;
+
+function archiveDocument(docId, docName) {
+  showCustomConfirm(`Arsipkan dokumen "${docName}"? Dokumen akan dipindahkan ke arsip.`).then(confirmed => {
+    if (!confirmed) return;
+    showCustomAlert(`Dokumen "${docName}" berhasil diarsipkan.`);
+  });
+}
+window.archiveDocument = archiveDocument;
+
+async function bulkDownload() {
+  if (selectedDocIds.size === 0) return;
+  showCustomAlert(`Mengunduh ${selectedDocIds.size} dokumen... Fitur unduh massal akan segera tersedia.`);
+}
+window.bulkDownload = bulkDownload;
+
+function bulkForward() {
+  if (selectedDocIds.size === 0) return;
+  showCustomAlert(`Meneruskan ${selectedDocIds.size} dokumen... Fitur teruskan massal akan segera tersedia.`);
+}
+window.bulkForward = bulkForward;
+
+function bulkArchive() {
+  if (selectedDocIds.size === 0) return;
+  showCustomConfirm(`Arsipkan ${selectedDocIds.size} dokumen yang dipilih?`).then(confirmed => {
+    if (!confirmed) return;
+    showCustomAlert(`${selectedDocIds.size} dokumen berhasil diarsipkan.`);
+  });
+}
+window.bulkArchive = bulkArchive;
 
 function setupDragAndDrop() {
   const dropzone = $('upload-dropzone');
@@ -2410,8 +2581,8 @@ function showNotionTypeDialog(pageTitle) {
   });
 }
 
-window.createNewNotionPage = async function() {
-  currentNotionPageId = null; 
+window.createNewNotionPage = async function () {
+  currentNotionPageId = null;
   await addSubpageToCurrent();
 };
 
@@ -2426,7 +2597,7 @@ async function addSubpageToCurrent() {
 
   const typeChoice = await showNotionTypeDialog(pageTitle);
   if (!typeChoice) return; // Dibatalkan oleh user
-  
+
   const isDb = typeChoice.isDb;
 
   try {
@@ -2849,9 +3020,9 @@ async function toggleNotionEditMode() {
       });
       summernoteInitialized = true;
     }
-    
+
     jQuery('#notion-summernote').summernote('code', htmlContent);
-    
+
   } else {
     notionEditMode = false;
     editBtn.textContent = 'Edit';

@@ -431,13 +431,42 @@
 
           <!-- Table -->
           <div class="sf-table-wrapper">
+            <div id="sharing-bulk-bar" class="sf-bulk-bar">
+              <span class="sf-bulk-count" id="bulk-count">0 dipilih</span>
+              <button class="btn-bulk-action" onclick="bulkDownload()" title="Unduh yang dipilih">📥 Unduh</button>
+              <button class="btn-bulk-action" onclick="bulkForward()" title="Teruskan yang dipilih">➡️ Teruskan</button>
+              <button class="btn-bulk-action" onclick="bulkArchive()" title="Arsipkan yang dipilih">🗄️
+                Arsipkan</button>
+              <button class="btn-bulk-action" onclick="clearBulkSelection()" style="margin-left:auto;">✕ Batal</button>
+            </div>
             <table class="sf-table">
               <thead>
                 <tr>
-                  <th>Tanggal</th>
-                  <th>Dokumen</th>
-                  <th>Pengirim</th>
-                  <th>Penerima</th>
+                  <th class="sf-checkbox-cell"><input type="checkbox" id="select-all-docs" title="Pilih semua"
+                      onchange="toggleSelectAll(this)"></th>
+                  <th class="sortable" data-sort="tgl" onclick="sortDocuments('tgl')">Tanggal <span
+                      class="sort-indicator active" id="sort-ind-tgl">▼</span></th>
+                  <th class="sortable" data-sort="document_name" onclick="sortDocuments('document_name')">Dokumen <span
+                      class="sort-indicator" id="sort-ind-document_name">▲▼</span></th>
+                  <th class="sortable" data-sort="senderName" onclick="sortDocuments('senderName')">Pengirim <span
+                      class="sort-indicator" id="sort-ind-senderName">▲▼</span></th>
+                  <th>Penerima <span class="sf-legend-trigger" title="Kode warna divisi">ℹ️<span
+                        class="sf-legend-popup">
+                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#ef4444"></span>
+                          Marketing</div>
+                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#22c55e"></span>
+                          SDM</div>
+                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#eab308"></span>
+                          Keuangan</div>
+                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#3b82f6"></span>
+                          Operasional</div>
+                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#8b5cf6"></span>
+                          Manager</div>
+                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#6b7280"></span>
+                          Staff</div>
+                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#ec4899"></span>
+                          Dokter</div>
+                      </span></span></th>
                   <th>Aksi</th>
                 </tr>
               </thead>

@@ -2057,7 +2057,9 @@ function previewDocument(docId, filename, docName) {
           let html = '';
           workbook.SheetNames.forEach((sheetName) => {
             const sheet = workbook.Sheets[sheetName];
-            const sheetHtml = XLSX.utils.sheet_to_html(sheet, { editable: false });
+            let sheetHtml = XLSX.utils.sheet_to_html(sheet, { editable: false });
+            // Ubah baris pertama menjadi th agar style table header (sticky + background grey) teraplikasi
+            sheetHtml = sheetHtml.replace(/<tr.*?>.*?<\/tr>/i, match => match.replace(/<td/g, '<th').replace(/<\/td>/g, '</th>'));
             if (workbook.SheetNames.length > 1) {
               html += `<div style="margin-bottom:16px;"><strong style="font-size:13px;color:var(--text-secondary);">Sheet: ${esc(sheetName)}</strong></div>`;
             }

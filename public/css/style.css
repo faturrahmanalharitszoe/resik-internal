@@ -4751,7 +4751,8 @@ html[data-theme="dark"] .doc-preview-content .docx-container {
   border: 1px solid var(--border);
   padding: 6px 10px;
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .doc-preview-content .xlsx-table-wrapper table th {

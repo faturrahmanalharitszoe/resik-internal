@@ -1783,6 +1783,12 @@ function renderDocumentsTable() {
            Unduh
          </button>`
       : '';
+    const previewBtn = (doc.file && isPreviewable(doc.file))
+      ? `<button class="btn-action preview-btn" onclick="event.stopPropagation(); previewDocument('${doc.file.replace(/\\/g, '/').split('/').pop().replace(/'/g, "\\'")}', '${esc(doc.document_name).replace(/'/g, "\\'")}')">
+           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+           Preview
+         </button>`
+      : '';
 
     tr.style.cursor = 'pointer';
     tr.addEventListener('click', (e) => {
@@ -1817,6 +1823,7 @@ function renderDocumentsTable() {
           Detail
         </button>
         ${downloadBtn}
+        ${previewBtn}
         ${editBtn}
         ${deleteDocBtn}
       </td>
@@ -1935,6 +1942,103 @@ async function bulkDownload() {
 }
 window.bulkDownload = bulkDownload;
 
+/* ─── DOCUMENT PREVIEW ─── */
+function getFileExtension(filename) {
+  if (!filename) return '';
+  return filename.split('.').pop().toLowerCase();
+}
+
+function isPreviewable(filename) {
+  const ext = getFileExtension(filename);
+  return ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext);
+}
+
+function getFileTypeLabel(filename) {
+  const ext = getFileExtension(filename);
+  const labels = {
+    pdf: 'PDF', docx: 'Word', doc: 'Word', xlsx: 'Excel', xls: 'Excel',
+    png: 'Gambar', jpg: 'Gambar', jpeg: 'Gambar', gif: 'Gambar',
+    bmp: 'Gambar', webp: 'Gambar', svg: 'Gambar'
+  };
+  return labels[ext] || ext.toUpperCase();
+}
+
+function previewDocument(filename, docName) {
+  const ext = getFileExtension(filename);
+  const overlay = $('doc-preview-overlay');
+  const title = $('doc-preview-title');
+  const content = $('doc-preview-content');
+  const downloadBtn = $('doc-preview-download-btn');
+  const fileUrl = `${API}/uploads/${filename.replace(/\\/g, '/').split('/').pop()}`;
+
+  title.textContent = `Preview — ${docName || filename}`;
+  downloadBtn.href = fileUrl;
+  downloadBtn.download = filename.split('/').pop();
+  content.innerHTML = '<div class="doc-preview-loading"><div class="spinner"></div>Memuat preview…</div>';
+  overlay.classList.remove('hidden');
+
+  if (ext === 'pdf') {
+    content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:100%;min-height:600px;border:none;"></iframe>`;
+  } else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) {
+    content.innerHTML = `<img src="${fileUrl}" alt="${esc(docName || filename)}" style="max-width:100%;max-height:100%;display:block;margin:auto;padding:20px;object-fit:contain;">`;
+  } else if (ext === 'docx') {
+    content.innerHTML = '<div id="docx-render-target" class="docx-container"></div>';
+    fetch(fileUrl)
+      .then(res => {
+        if (!res.ok) throw new Error('Gagal memuat file');
+        return res.arrayBuffer();
+      })
+      .then(buffer => {
+        const target = document.getElementById('docx-render-target');
+        if (window.docx) {
+          window.docx.renderAsync(buffer, target, null, { className: 'docx' });
+        } else {
+          target.innerHTML = '<p style="padding:20px;color:#666;">Library docx-preview tidak termuat. Silakan unduh file untuk melihatnya.</p>';
+        }
+      })
+      .catch(err => {
+        content.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444;">Gagal memuat preview: ${esc(err.message)}<br><br><a href="${fileUrl}" download class="btn-primary-sm" style="text-decoration:none;">Unduh File</a></div>`;
+      });
+  } else if (['xlsx', 'xls'].includes(ext)) {
+    content.innerHTML = '<div id="xlsx-render-target" class="xlsx-table-wrapper"></div>';
+    fetch(fileUrl)
+      .then(res => {
+        if (!res.ok) throw new Error('Gagal memuat file');
+        return res.arrayBuffer();
+      })
+      .then(buffer => {
+        if (window.XLSX) {
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const target = document.getElementById('xlsx-render-target');
+          let html = '';
+          workbook.SheetNames.forEach((sheetName) => {
+            const sheet = workbook.Sheets[sheetName];
+            const sheetHtml = XLSX.utils.sheet_to_html(sheet, { editable: false });
+            if (workbook.SheetNames.length > 1) {
+              html += `<div style="margin-bottom:16px;"><strong style="font-size:13px;color:var(--text-secondary);">Sheet: ${esc(sheetName)}</strong></div>`;
+            }
+            html += `<div style="margin-bottom:20px;overflow:auto;">${sheetHtml}</div>`;
+          });
+          target.innerHTML = html;
+        } else {
+          target.innerHTML = '<p style="padding:20px;color:#666;">Library SheetJS tidak termuat. Silakan unduh file untuk melihatnya.</p>';
+        }
+      })
+      .catch(err => {
+        content.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444;">Gagal memuat preview: ${esc(err.message)}<br><br><a href="${fileUrl}" download class="btn-primary-sm" style="text-decoration:none;">Unduh File</a></div>`;
+      });
+  } else {
+    content.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-secondary);">Preview tidak tersedia untuk tipe file .${ext}.<br><br><a href="${fileUrl}" download class="btn-primary-sm" style="text-decoration:none;">Unduh File</a></div>`;
+  }
+}
+window.previewDocument = previewDocument;
+
+function closeDocPreview() {
+  const overlay = $('doc-preview-overlay');
+  overlay.classList.add('hidden');
+  $('doc-preview-content').innerHTML = '';
+}
+window.closeDocPreview = closeDocPreview;
 
 function setupDragAndDrop() {
   const dropzone = $('upload-dropzone');

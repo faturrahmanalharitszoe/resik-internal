@@ -85,10 +85,10 @@ router.get('/counts', async (req, res) => {
     let paramsOut = [displayName];
 
     // For OUT: mirror the frontend "keluar" tab logic
-    if (role === 'top management') {
-      // Top management doesn't use "keluar" tab (uses "semua" instead), so keluar count = 0
-      totalOutQuery = 'SELECT 0 AS count';
-      todayOutQuery = 'SELECT 0 AS count';
+    if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
+      // Admin/Top management sees all documents (uses "semua" tab), so keluar = all docs
+      totalOutQuery = 'SELECT COUNT(*) FROM shared_documents';
+      todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE tgl >= CURRENT_DATE';
       paramsOut = [];
     } else if (role === 'management' && (jabatan === 'SM' || jabatan === 'Senior Manager')) {
       // Management sees own docs + docs from their division

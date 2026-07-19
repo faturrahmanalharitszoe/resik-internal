@@ -1269,9 +1269,11 @@ function initSharingEvents() {
 function initSharingFolder() {
   renderSharingTabs();
 
+  const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator');
+
   // Set default active tab based on role
   document.querySelectorAll('.sf-tab, .sharing-tab-btn').forEach(btn => btn.classList.remove('active'));
-  if (currentUser.role === 'top management') {
+  if (currentUser.role === 'top management' || isAdmin) {
     activeTab = 'semua';
     const semuaBtn = $('tab-semua-btn');
     if (semuaBtn) { semuaBtn.classList.remove('hidden'); semuaBtn.classList.add('active'); }
@@ -1301,9 +1303,11 @@ function renderSharingTabs() {
   tabDivisi.classList.add('hidden');
   tabSemua.classList.add('hidden');
 
+  const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator');
+
   if (currentUser.role === 'management') {
     tabDivisi.classList.remove('hidden');
-  } else if (currentUser.role === 'top management') {
+  } else if (currentUser.role === 'top management' || isAdmin) {
     tabSemua.classList.remove('hidden');
   }
 }
@@ -1620,36 +1624,40 @@ function renderDocumentsTable() {
         if (!isOwnDoc) return false;
       }
     } else if (activeTab === 'masuk') {
-      const senderLower = (doc.senderName || '').toLowerCase().trim();
-      const currentNameLower = (currentUser.display_name || '').toLowerCase().trim();
-      if (senderLower === currentNameLower) return false;
-      const recs = (doc.penerima || '').split(',').map(r => r.trim());
+      // Admin sees all documents (same as "semua" tab)
+      const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator');
+      if (!isAdmin) {
+        const senderLower = (doc.senderName || '').toLowerCase().trim();
+        const currentNameLower = (currentUser.display_name || '').toLowerCase().trim();
+        if (senderLower === currentNameLower) return false;
+        const recs = (doc.penerima || '').split(',').map(r => r.trim());
 
-      // Build the full list of group labels the current user belongs to
-      const userGroups = [currentUser.display_name];
-      const mappedDiv = divisionLabels[currentUser.division] || '';
-      if (mappedDiv) {
-        userGroups.push('Divisi ' + mappedDiv);
+        // Build the full list of group labels the current user belongs to
+        const userGroups = [currentUser.display_name];
+        const mappedDiv = divisionLabels[currentUser.division] || '';
+        if (mappedDiv) {
+          userGroups.push('Divisi ' + mappedDiv);
+          const jbt = currentUser.jabatan || 'Staff';
+          userGroups.push(jbt + ' ' + mappedDiv);
+        }
         const jbt = currentUser.jabatan || 'Staff';
-        userGroups.push(jbt + ' ' + mappedDiv);
-      }
-      const jbt = currentUser.jabatan || 'Staff';
-      if (jbt === 'Direktur Umum') {
-        userGroups.push('Direktur Umum');
-      } else if (jbt === 'Wakil Direktur' || jbt === 'Wakil Direktur Utama') {
-        userGroups.push('Wakil Direktur');
-        userGroups.push('Wakil Direktur Utama');
-      } else if (jbt === 'Direktur') {
-        userGroups.push('Direktur');
-      } else if (jbt === 'SM' || jbt === 'Senior Manager') {
-        userGroups.push('Semua SM');
-        userGroups.push('Semua Senior Manager');
-      } else if (jbt === 'Staff') {
-        userGroups.push('Semua Staff');
-      }
+        if (jbt === 'Direktur Umum') {
+          userGroups.push('Direktur Umum');
+        } else if (jbt === 'Wakil Direktur' || jbt === 'Wakil Direktur Utama') {
+          userGroups.push('Wakil Direktur');
+          userGroups.push('Wakil Direktur Utama');
+        } else if (jbt === 'Direktur') {
+          userGroups.push('Direktur');
+        } else if (jbt === 'SM' || jbt === 'Senior Manager') {
+          userGroups.push('Semua SM');
+          userGroups.push('Semua Senior Manager');
+        } else if (jbt === 'Staff') {
+          userGroups.push('Semua Staff');
+        }
 
-      const isRecipient = userGroups.some(g => recs.includes(g));
-      if (!isRecipient) return false;
+        const isRecipient = userGroups.some(g => recs.includes(g));
+        if (!isRecipient) return false;
+      }
     } else if (activeTab === 'divisi') {
       // For SM, backend already filtered to their division list.
     } else if (activeTab === 'semua') {

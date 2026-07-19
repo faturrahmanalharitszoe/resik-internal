@@ -1785,11 +1785,12 @@ function renderDocumentsTable() {
            Hapus
          </button>`
       : '';
+    const dlFileName = doc.file ? doc.file.replace(/\\/g, '/').split('/').pop() : '';
     const downloadBtn = doc.file
-      ? `<button class="btn-action download-btn" onclick="event.stopPropagation(); window.open('${API}/uploads/${doc.file.replace(/\\/g, '/').split('/').pop()}', '_blank')">
+      ? `<a class="btn-action download-btn" style="text-decoration:none; display:inline-flex;" href="${API}/uploads/${dlFileName}" download="${dlFileName}" onclick="event.stopPropagation();">
            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
            Unduh
-         </button>`
+         </a>`
       : '';
     const previewBtn = (doc.file && isPreviewable(doc.file))
       ? `<button class="btn-action preview-btn" onclick="event.stopPropagation(); previewDocument('${doc.id}', '${doc.file.replace(/\\/g, '/').split('/').pop().replace(/'/g, "\\'")}', '${esc(doc.document_name).replace(/'/g, "\\'")}')">

@@ -434,7 +434,8 @@
             <div id="sharing-bulk-bar" class="sf-bulk-bar">
               <span class="sf-bulk-count" id="bulk-count">0 dipilih</span>
               <button class="btn-bulk-action" onclick="bulkDownload()" title="Unduh yang dipilih">📥 Unduh</button>
-              <button class="btn-bulk-action" style="color: var(--danger);" onclick="bulkDelete()" title="Hapus yang dipilih">🗑️ Hapus</button>
+              <button class="btn-bulk-action" style="color: var(--danger);" onclick="bulkDelete()"
+                title="Hapus yang dipilih">🗑️ Hapus</button>
               <button class="btn-bulk-action" onclick="clearBulkSelection()" style="margin-left:auto;">✕ Batal</button>
             </div>
             <table class="sf-table">
@@ -462,8 +463,6 @@
                           Manager</div>
                         <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#6b7280"></span>
                           Staff</div>
-                        <div class="sf-legend-popup-item"><span class="legend-dot" style="background:#ec4899"></span>
-                          Dokter</div>
                       </span></span></th>
                   <th>Aksi</th>
                 </tr>
@@ -880,7 +879,7 @@
         </div>
       </div>
       <div class="peek-section">
-        <a id="peek-btn-download" class="btn-primary-sm" style="text-decoration:none;" target="_blank">
+        <a id="peek-btn-download" class="btn-primary-sm" style="text-decoration:none;" target="_blank" download>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />

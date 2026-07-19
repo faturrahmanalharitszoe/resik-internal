@@ -1535,25 +1535,6 @@ html[data-theme="dark"] .sf-main-card {
   border-color: var(--online);
 }
 
-.btn-action.forward-btn {
-  border-color: rgba(250, 176, 5, 0.25);
-  color: #f59e0b;
-}
-
-.btn-action.forward-btn:hover {
-  background: rgba(250, 176, 5, 0.1);
-  border-color: #f59e0b;
-}
-
-.btn-action.archive-btn {
-  border-color: rgba(139, 92, 246, 0.25);
-  color: #8b5cf6;
-}
-
-.btn-action.archive-btn:hover {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: #8b5cf6;
-}
 
 /* ── Division badge legend ── */
 .sf-legend-wrap {

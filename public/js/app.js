@@ -1818,14 +1818,6 @@ function renderDocumentsTable() {
         </button>
         ${downloadBtn}
         ${editBtn}
-        <button class="btn-action forward-btn" onclick="event.stopPropagation(); forwardDocument('${doc.id}', '${esc(doc.document_name)}')" title="Teruskan">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-          Teruskan
-        </button>
-        <button class="btn-action archive-btn" onclick="event.stopPropagation(); archiveDocument('${doc.id}', '${esc(doc.document_name)}')" title="Arsipkan">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          Arsip
-        </button>
         ${deleteDocBtn}
       </td>
     `;
@@ -1937,39 +1929,12 @@ function clearBulkSelection() {
 }
 window.clearBulkSelection = clearBulkSelection;
 
-function forwardDocument(docId, docName) {
-  showCustomAlert(`Fitur "Teruskan" untuk dokumen "${docName}" akan segera tersedia.`);
-}
-window.forwardDocument = forwardDocument;
-
-function archiveDocument(docId, docName) {
-  showCustomConfirm(`Arsipkan dokumen "${docName}"? Dokumen akan dipindahkan ke arsip.`).then(confirmed => {
-    if (!confirmed) return;
-    showCustomAlert(`Dokumen "${docName}" berhasil diarsipkan.`);
-  });
-}
-window.archiveDocument = archiveDocument;
-
 async function bulkDownload() {
   if (selectedDocIds.size === 0) return;
   showCustomAlert(`Mengunduh ${selectedDocIds.size} dokumen... Fitur unduh massal akan segera tersedia.`);
 }
 window.bulkDownload = bulkDownload;
 
-function bulkForward() {
-  if (selectedDocIds.size === 0) return;
-  showCustomAlert(`Meneruskan ${selectedDocIds.size} dokumen... Fitur teruskan massal akan segera tersedia.`);
-}
-window.bulkForward = bulkForward;
-
-function bulkArchive() {
-  if (selectedDocIds.size === 0) return;
-  showCustomConfirm(`Arsipkan ${selectedDocIds.size} dokumen yang dipilih?`).then(confirmed => {
-    if (!confirmed) return;
-    showCustomAlert(`${selectedDocIds.size} dokumen berhasil diarsipkan.`);
-  });
-}
-window.bulkArchive = bulkArchive;
 
 function setupDragAndDrop() {
   const dropzone = $('upload-dropzone');

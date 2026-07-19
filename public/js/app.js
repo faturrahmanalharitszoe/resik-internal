@@ -1784,7 +1784,7 @@ function renderDocumentsTable() {
          </button>`
       : '';
     const previewBtn = (doc.file && isPreviewable(doc.file))
-      ? `<button class="btn-action preview-btn" onclick="event.stopPropagation(); previewDocument('${doc.file.replace(/\\/g, '/').split('/').pop().replace(/'/g, "\\'")}', '${esc(doc.document_name).replace(/'/g, "\\'")}')">
+      ? `<button class="btn-action preview-btn" onclick="event.stopPropagation(); previewDocument('${doc.id}', '${doc.file.replace(/\\/g, '/').split('/').pop().replace(/'/g, "\\'")}', '${esc(doc.document_name).replace(/'/g, "\\'")}')">
            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
            Preview
          </button>`
@@ -1963,7 +1963,7 @@ function getFileTypeLabel(filename) {
   return labels[ext] || ext.toUpperCase();
 }
 
-function previewDocument(filename, docName) {
+function previewDocument(docId, filename, docName) {
   const ext = getFileExtension(filename);
   const overlay = $('doc-preview-overlay');
   const title = $('doc-preview-title');
@@ -1976,6 +1976,11 @@ function previewDocument(filename, docName) {
   downloadBtn.download = filename.split('/').pop();
   content.innerHTML = '<div class="doc-preview-loading"><div class="spinner"></div>Memuat preview…</div>';
   overlay.classList.remove('hidden');
+
+  // Log view event (fire-and-forget, same as openDetailModal)
+  if (docId) {
+    apiFetch(`/api/documents/${docId}/view`, { method: 'POST' }).catch(() => { });
+  }
 
   if (ext === 'pdf') {
     content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:100%;min-height:600px;border:none;"></iframe>`;

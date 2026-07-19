@@ -713,4 +713,43 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// POST /api/documents/bulk_delete - delete multiple documents
+router.post('/bulk_delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Tidak ada dokumen yang dipilih' });
+    }
+    const user = req.user;
+    
+    let deletedCount = 0;
+    
+    for (const id of ids) {
+      const docResult = await db.query('SELECT * FROM shared_documents WHERE id = $1', [id]);
+      if (docResult.rows.length === 0) continue;
+      
+      const doc = docResult.rows[0];
+      
+      // Only owner, top management, or admin can delete
+      if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin && user.username !== 'admin' && user.username !== 'administrator') {
+        continue;
+      }
+      
+      // Delete physical file
+      const filePath = path.join(__dirname, '../..', doc.file_path);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting file:', e); }
+      }
+      
+      await db.query('DELETE FROM shared_documents WHERE id = $1', [id]);
+      deletedCount++;
+    }
+    
+    res.json({ message: 'Dokumen berhasil dihapus', deletedCount });
+  } catch (err) {
+    console.error('Error bulk deleting documents:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

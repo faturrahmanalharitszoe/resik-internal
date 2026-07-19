@@ -1950,6 +1950,37 @@ async function bulkDownload() {
 }
 window.bulkDownload = bulkDownload;
 
+async function bulkDelete() {
+  if (selectedDocIds.size === 0) return;
+  const confirmed = await showCustomConfirm(`Hapus ${selectedDocIds.size} dokumen secara permanen? File juga akan ikut terhapus.`);
+  if (!confirmed) return;
+  
+  try {
+    const res = await fetch(`${API}/api/documents/bulk_delete`, {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ids: Array.from(selectedDocIds) })
+    });
+    const data = await res.json();
+    
+    if (!res.ok) { 
+      showCustomAlert(data.error || 'Gagal menghapus dokumen'); 
+      return; 
+    }
+    
+    showCustomAlert(`${data.deletedCount} dokumen berhasil dihapus!`);
+    clearBulkSelection();
+    await loadSharedDocuments();
+  } catch (err) {
+    console.error('Error bulk delete:', err);
+    showCustomAlert('Terjadi kesalahan saat menghapus dokumen secara massal');
+  }
+}
+window.bulkDelete = bulkDelete;
+
 /* ─── DOCUMENT PREVIEW ─── */
 function getFileExtension(filename) {
   if (!filename) return '';

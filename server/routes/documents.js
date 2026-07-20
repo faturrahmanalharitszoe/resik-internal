@@ -338,9 +338,9 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
   try {
     const { project_name, document_type, sub_tipe, document_name, document_number, description, penerima, senderName, senderDivision, userId, tgl } = req.body;
 
-    if (!project_name || !document_type || !document_number) {
+    if (!document_type || !document_number) {
       if (req.file) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'Project name, document type, and document number are required' });
+      return res.status(400).json({ error: 'Document type and document number are required' });
     }
 
     if (!req.file) {

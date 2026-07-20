@@ -1070,6 +1070,7 @@ async function showApp() {
   initSharingEvents();
   await loadNotionWorkspace();
   await loadNotifications();
+  checkNotificationPermission();
   switchSidebarTab('chat', false);
 }
 

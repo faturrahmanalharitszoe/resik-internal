@@ -134,20 +134,27 @@
         </button>
       </div>
       <div class="activity-footer" style="position: relative;">
-        <button id="btn-notifications" class="activity-icon-btn" title="Notifikasi" style="position: relative; margin-right: 10px;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button id="btn-notifications" class="activity-icon-btn" title="Notifikasi"
+          style="position: relative; margin-right: 10px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
           </svg>
-          <span id="notification-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 9999px; padding: 2px 5px; font-size: 10px; font-weight: bold; line-height: 1;">0</span>
+          <span id="notification-badge" class="hidden"
+            style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 9999px; padding: 2px 5px; font-size: 10px; font-weight: bold; line-height: 1;">0</span>
         </button>
         <!-- Notification Dropdown -->
-        <div id="notification-dropdown" class="hidden" style="position: absolute; bottom: 0; left: 100%; width: 300px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); margin-left: 16px; z-index: 100; overflow: hidden; display: flex; flex-direction: column;">
-          <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; align-items: center;">
+        <div id="notification-dropdown" class="hidden"
+          style="position: absolute; bottom: 0; left: 100%; width: 300px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); margin-left: 16px; z-index: 100; overflow: hidden; display: flex; flex-direction: column;">
+          <div
+            style="padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; align-items: center;">
             Notifikasi Baru
           </div>
-          <div id="notification-list" style="max-height: 320px; overflow-y: auto; padding: 0; background: var(--bg-main);">
-            <div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px;">Belum ada notifikasi baru</div>
+          <div id="notification-list"
+            style="max-height: 320px; overflow-y: auto; padding: 0; background: var(--bg-surface);">
+            <div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px;">Belum ada
+              notifikasi baru</div>
           </div>
         </div>
         <button id="btn-logout" class="activity-icon-btn" title="Keluar">
@@ -728,8 +735,8 @@
                   <span class="dropzone-icon">📁</span>
                   <span class="dropzone-text">Seret berkas ke sini atau klik untuk memilih</span>
                   <span id="upload-file-info" class="dropzone-file-info hidden"></span>
-                  <input type="file" id="upload-file-input" style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg"
-                    required />
+                  <input type="file" id="upload-file-input" style="display: none;"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg" required />
                 </div>
               </div>
             </div>

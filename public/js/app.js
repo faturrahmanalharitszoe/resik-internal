@@ -594,8 +594,8 @@ function connectSocket() {
 
       const time = new Date(notif.created_at || new Date()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       const itemHtml = `
-        <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
-          <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">${esc(notif.message)}</div>
+        <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
+          <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${esc(notif.message)}</div>
           <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
             <span>Dari: ${esc(notif.sender_name || 'Sistem')}</span>
             <span>${time}</span>
@@ -5059,8 +5059,8 @@ async function loadNotifications() {
       notifs.forEach(notif => {
         const time = new Date(notif.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
         html += `
-          <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
-            <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">${esc(notif.message)}</div>
+          <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${esc(notif.message)}</div>
             <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
               <span>Dari: ${esc(notif.sender_name || 'Sistem')}</span>
               <span>${time}</span>

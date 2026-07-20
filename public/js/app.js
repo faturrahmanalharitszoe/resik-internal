@@ -586,6 +586,27 @@ function connectSocket() {
         badge.classList.remove('hidden');
       }
       showCustomAlert(`Dokumen Baru: ${doc.document_name} telah dibagikan ke divisi Anda.`);
+      
+      // Update Dropdown List
+      const listContainer = $('notification-list');
+      if (listContainer) {
+        // Remove empty state message if it exists
+        if (listContainer.innerHTML.includes('Belum ada notifikasi baru')) {
+          listContainer.innerHTML = '';
+        }
+        
+        const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const itemHtml = `
+          <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="loadSharedDocuments(); switchView('sharing'); document.getElementById('notification-dropdown').classList.add('hidden');">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Dokumen Baru: ${esc(doc.document_name)}</div>
+            <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
+              <span>Dari: ${esc(doc.sender_name || 'Sistem')}</span>
+              <span>${time}</span>
+            </div>
+          </div>
+        `;
+        listContainer.insertAdjacentHTML('afterbegin', itemHtml);
+      }
     }
   });
 
@@ -5042,14 +5063,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Clear notification badge on click
+  // Clear notification badge on click and toggle dropdown
   const btnBell = $('btn-notifications');
-  if (btnBell) {
-    btnBell.addEventListener('click', () => {
+  const dropdown = $('notification-dropdown');
+  if (btnBell && dropdown) {
+    btnBell.addEventListener('click', (e) => {
+      e.stopPropagation();
       const badge = $('notification-badge');
       if (badge) {
         badge.textContent = '0';
         badge.classList.add('hidden');
+      }
+      dropdown.classList.toggle('hidden');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target) && e.target !== btnBell && !btnBell.contains(e.target)) {
+        dropdown.classList.add('hidden');
       }
     });
   }

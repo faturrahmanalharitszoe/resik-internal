@@ -5045,7 +5045,7 @@ document.addEventListener('DOMContentLoaded', () => {
         badge.textContent = '0';
         badge.classList.add('hidden');
       }
-      loadDocuments();
+      loadSharedDocuments();
       switchView('sharing');
     });
   }

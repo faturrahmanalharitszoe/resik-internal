@@ -473,7 +473,8 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
           }
 
           // 3. Fetch push subscriptions
-          const subsRes = await db.query("SELECT * FROM push_subscriptions WHERE user_id = ANY($1)", [targetUserIds]);
+          const placeholders = targetUserIds.map((_, i) => '$' + (i + 1)).join(',');
+          const subsRes = await db.query(`SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})`, targetUserIds);
 
           const payload = JSON.stringify({
             title: 'Dokumen Baru Diterima',

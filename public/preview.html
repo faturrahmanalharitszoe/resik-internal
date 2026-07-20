@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Preview Dokumen</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f3f4f6;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .header {
+      background: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      z-index: 10;
+    }
+    .header h2 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--text-primary);
+    }
+    .content-area {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+    }
+    /* Copied necessary preview styles if not fully covered by style.css */
+    .docx-container {
+      background: #f3f4f6;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+    }
+    .xlsx-table-wrapper {
+      padding: 24px;
+      background: white;
+      min-height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2 id="doc-title">Preview Dokumen</h2>
+    <a id="download-btn" class="btn-primary" style="text-decoration:none;" download>
+      Unduh File Asli
+    </a>
+  </div>
+  <div id="content" class="content-area">
+    <div style="display:flex; align-items:center; justify-content:center; height:100%; color:#666;">
+      <div class="spinner"></div>&nbsp;Memuat preview...
+    </div>
+  </div>
+
+  <script>
+    function getFileExtension(filename) {
+      if (!filename) return '';
+      return filename.split('.').pop().toLowerCase();
+    }
+    
+    function esc(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const filename = params.get('file');
+    const docName = params.get('name');
+    
+    if (!filename) {
+      document.getElementById('content').innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444;">Parameter file tidak valid.</div>';
+    } else {
+      document.getElementById('doc-title').textContent = docName || filename;
+      
+      const fileUrl = `/uploads/${filename.replace(/\\/g, '/').split('/').pop()}`;
+      const downloadBtn = document.getElementById('download-btn');
+      downloadBtn.href = fileUrl;
+      downloadBtn.download = filename.split('/').pop();
+      
+      const content = document.getElementById('content');
+      const ext = getFileExtension(filename);
+      
+      if (ext === 'pdf') {
+        content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:100%;border:none;"></iframe>`;
+      } else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) {
+        content.innerHTML = `<img src="${fileUrl}" alt="${esc(docName || filename)}" style="max-width:100%;max-height:100%;display:block;margin:auto;padding:20px;object-fit:contain;">`;
+      } else if (ext === 'docx') {
+        content.innerHTML = '<div id="docx-render-target" class="docx-container"></div>';
+        fetch(fileUrl)
+          .then(res => {
+            if (!res.ok) throw new Error('Gagal memuat file');
+            return res.arrayBuffer();
+          })
+          .then(buffer => {
+            const target = document.getElementById('docx-render-target');
+            if (window.docx) {
+              window.docx.renderAsync(buffer, target, null, { className: 'docx' });
+            } else {
+              target.innerHTML = '<p style="padding:20px;color:#666;">Library docx-preview tidak termuat.</p>';
+            }
+          })
+          .catch(err => {
+            content.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444;">Gagal memuat preview: ${esc(err.message)}</div>`;
+          });
+      } else if (['xlsx', 'xls'].includes(ext)) {
+        content.innerHTML = '<div id="xlsx-render-target" class="xlsx-table-wrapper"></div>';
+        fetch(fileUrl)
+          .then(res => {
+            if (!res.ok) throw new Error('Gagal memuat file');
+            return res.arrayBuffer();
+          })
+          .then(buffer => {
+            if (window.XLSX) {
+              const workbook = XLSX.read(buffer, { type: 'array' });
+              const target = document.getElementById('xlsx-render-target');
+              let html = '';
+              workbook.SheetNames.forEach((sheetName) => {
+                const sheet = workbook.Sheets[sheetName];
+                let sheetHtml = XLSX.utils.sheet_to_html(sheet, { editable: false });
+                sheetHtml = sheetHtml.replace(/<tr.*?>.*?<\/tr>/i, match => match.replace(/<td/g, '<th').replace(/<\/td>/g, '</th>'));
+                if (workbook.SheetNames.length > 1) {
+                  html += `<div style="margin-bottom:16px;"><strong style="font-size:13px;color:#666;">Sheet: ${esc(sheetName)}</strong></div>`;
+                }
+                html += `<div style="margin-bottom:20px;overflow:auto;">${sheetHtml}</div>`;
+              });
+              target.innerHTML = html;
+            } else {
+              document.getElementById('xlsx-render-target').innerHTML = '<p style="padding:20px;color:#666;">Library SheetJS tidak termuat.</p>';
+            }
+          })
+          .catch(err => {
+            content.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444;">Gagal memuat preview: ${esc(err.message)}</div>`;
+          });
+      } else {
+        content.innerHTML = `<div style="padding:40px;text-align:center;color:#666;">Preview tidak tersedia untuk tipe file .${ext}.</div>`;
+      }
+    }
+  </script>
+</body>
+</html>

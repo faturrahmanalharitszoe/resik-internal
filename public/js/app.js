@@ -2004,86 +2004,21 @@ function getFileTypeLabel(filename) {
 }
 
 function previewDocument(docId, filename, docName) {
-  const ext = getFileExtension(filename);
-  const overlay = $('doc-preview-overlay');
-  const title = $('doc-preview-title');
-  const content = $('doc-preview-content');
-  const downloadBtn = $('doc-preview-download-btn');
-  const fileUrl = `${API}/uploads/${filename.replace(/\\/g, '/').split('/').pop()}`;
-
-  title.textContent = `Preview — ${docName || filename}`;
-  downloadBtn.href = fileUrl;
-  downloadBtn.download = filename.split('/').pop();
-  content.innerHTML = '<div class="doc-preview-loading"><div class="spinner"></div>Memuat preview…</div>';
-  overlay.classList.remove('hidden');
-
-  // Log view event (fire-and-forget, same as openDetailModal)
+  // Log view event
   if (docId) {
     apiFetch(`/api/documents/${docId}/view`, { method: 'POST' }).catch(() => { });
   }
-
-  if (ext === 'pdf') {
-    content.innerHTML = `<iframe src="${fileUrl}" style="width:100%;height:100%;min-height:600px;border:none;"></iframe>`;
-  } else if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) {
-    content.innerHTML = `<img src="${fileUrl}" alt="${esc(docName || filename)}" style="max-width:100%;max-height:100%;display:block;margin:auto;padding:20px;object-fit:contain;">`;
-  } else if (ext === 'docx') {
-    content.innerHTML = '<div id="docx-render-target" class="docx-container"></div>';
-    fetch(fileUrl)
-      .then(res => {
-        if (!res.ok) throw new Error('Gagal memuat file');
-        return res.arrayBuffer();
-      })
-      .then(buffer => {
-        const target = document.getElementById('docx-render-target');
-        if (window.docx) {
-          window.docx.renderAsync(buffer, target, null, { className: 'docx' });
-        } else {
-          target.innerHTML = '<p style="padding:20px;color:#666;">Library docx-preview tidak termuat. Silakan unduh file untuk melihatnya.</p>';
-        }
-      })
-      .catch(err => {
-        content.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444;">Gagal memuat preview: ${esc(err.message)}<br><br><a href="${fileUrl}" download class="btn-primary-sm" style="text-decoration:none;">Unduh File</a></div>`;
-      });
-  } else if (['xlsx', 'xls'].includes(ext)) {
-    content.innerHTML = '<div id="xlsx-render-target" class="xlsx-table-wrapper"></div>';
-    fetch(fileUrl)
-      .then(res => {
-        if (!res.ok) throw new Error('Gagal memuat file');
-        return res.arrayBuffer();
-      })
-      .then(buffer => {
-        if (window.XLSX) {
-          const workbook = XLSX.read(buffer, { type: 'array' });
-          const target = document.getElementById('xlsx-render-target');
-          let html = '';
-          workbook.SheetNames.forEach((sheetName) => {
-            const sheet = workbook.Sheets[sheetName];
-            let sheetHtml = XLSX.utils.sheet_to_html(sheet, { editable: false });
-            // Ubah baris pertama menjadi th agar style table header (sticky + background grey) teraplikasi
-            sheetHtml = sheetHtml.replace(/<tr.*?>.*?<\/tr>/i, match => match.replace(/<td/g, '<th').replace(/<\/td>/g, '</th>'));
-            if (workbook.SheetNames.length > 1) {
-              html += `<div style="margin-bottom:16px;"><strong style="font-size:13px;color:var(--text-secondary);">Sheet: ${esc(sheetName)}</strong></div>`;
-            }
-            html += `<div style="margin-bottom:20px;overflow:auto;">${sheetHtml}</div>`;
-          });
-          target.innerHTML = html;
-        } else {
-          target.innerHTML = '<p style="padding:20px;color:#666;">Library SheetJS tidak termuat. Silakan unduh file untuk melihatnya.</p>';
-        }
-      })
-      .catch(err => {
-        content.innerHTML = `<div style="padding:40px;text-align:center;color:#ef4444;">Gagal memuat preview: ${esc(err.message)}<br><br><a href="${fileUrl}" download class="btn-primary-sm" style="text-decoration:none;">Unduh File</a></div>`;
-      });
-  } else {
-    content.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-secondary);">Preview tidak tersedia untuk tipe file .${ext}.<br><br><a href="${fileUrl}" download class="btn-primary-sm" style="text-decoration:none;">Unduh File</a></div>`;
-  }
+  
+  const url = `preview.html?id=${docId}&file=${encodeURIComponent(filename)}&name=${encodeURIComponent(docName || filename)}`;
+  window.open(url, '_blank');
 }
 window.previewDocument = previewDocument;
 
 function closeDocPreview() {
   const overlay = $('doc-preview-overlay');
-  overlay.classList.add('hidden');
-  $('doc-preview-content').innerHTML = '';
+  if (overlay) overlay.classList.add('hidden');
+  const content = $('doc-preview-content');
+  if (content) content.innerHTML = '';
 }
 window.closeDocPreview = closeDocPreview;
 

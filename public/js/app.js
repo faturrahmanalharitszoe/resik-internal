@@ -714,6 +714,7 @@ function renderUsers() {
       sdm: 'SDM',
       keuangan: 'Keuangan',
       operasional: 'Operasional',
+    it: 'IT',
       it: 'IT'
     };
 
@@ -1002,6 +1003,7 @@ function getTagClassForRecipient(rec) {
   if (r.includes('sdm')) return 'tag-green';
   if (r.includes('keuangan')) return 'tag-yellow';
   if (r.includes('operasional')) return 'tag-blue';
+  if (r.includes('it')) return 'tag-cyan';
   if (r.includes('sm') || r.includes('manager')) return 'tag-purple';
   if (r.includes('staff')) return 'tag-gray';
   if (r.includes('direktur') || r.includes('wakil')) return 'tag-pink';
@@ -1024,6 +1026,7 @@ async function showApp() {
     sdm: 'SDM',
     keuangan: 'Keuangan',
     operasional: 'Operasional',
+    it: 'IT',
     it: 'IT'
   };
   const divLabel = divisionLabels[currentUser.division] || '';
@@ -1593,6 +1596,7 @@ function renderDocumentsTable() {
     sdm: 'SDM',
     keuangan: 'Keuangan',
     operasional: 'Operasional',
+    it: 'IT',
     it: 'IT'
   };
   const divLabel = divisionLabels[currentUser.division] || '';
@@ -2055,11 +2059,11 @@ function setupDragAndDrop() {
 }
 
 async function handleSelectedFile(file) {
-  const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
+  const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
   const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
   if (!allowedExtensions.includes(ext)) {
-    await showCustomAlert('Format berkas tidak didukung! Hanya PDF, DOC, DOCX, XLS, XLSX.');
+    await showCustomAlert('Format berkas tidak didukung! Hanya PDF, Word, Excel, dan Gambar (PNG/JPG/dll).');
     return;
   }
 
@@ -2309,7 +2313,8 @@ function openDetailModal(docId) {
     marketing: 'Marketing',
     sdm: 'SDM',
     keuangan: 'Keuangan',
-    operasional: 'Operasional'
+    operasional: 'Operasional',
+    it: 'IT'
   };
   const senderDiv = divisionLabels[doc.senderDivision] || doc.senderDivision || '';
   $('peek-sender').textContent = `${doc.senderName} (${senderDiv})`;
@@ -2407,7 +2412,8 @@ function openDetailModal(docId) {
           hour: '2-digit', minute: '2-digit'
         });
         const jabDiv = [v.viewer_jabatan, v.viewer_division ? (
-          { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' }[v.viewer_division] || v.viewer_division
+          { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+    it: 'IT' }[v.viewer_division] || v.viewer_division
         ) : null].filter(Boolean).join(' · ');
         return `
           <div style="display:flex; align-items:flex-start; gap:8px; padding:6px 8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
@@ -4501,7 +4507,8 @@ function renderMembersPanel() {
     li.className = 'member-item';
 
     const statusClass = member.is_online ? 'online' : 'offline';
-    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
+    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+    it: 'IT', it: 'IT' };
     const divLabel = divisionLabels[member.division] || '';
     const creatorBadge = member.is_creator ? '<span class="creator-badge">Pembuat</span>' : '';
 
@@ -4588,7 +4595,8 @@ function renderAddMemberList() {
   available.forEach((user) => {
     const li = document.createElement('li');
     li.className = 'add-member-item';
-    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
+    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+    it: 'IT', it: 'IT' };
     const divLabel = divisionLabels[user.division] || '';
 
     li.innerHTML = `
@@ -4660,7 +4668,8 @@ function renderAdminUsersTable(users) {
     marketing: 'Marketing',
     sdm: 'SDM',
     keuangan: 'Keuangan',
-    operasional: 'Operasional'
+    operasional: 'Operasional',
+    it: 'IT'
   };
 
   users.forEach(user => {
@@ -4828,7 +4837,8 @@ async function handleAdminUserSubmit(e) {
           marketing: 'Marketing',
           sdm: 'SDM',
           keuangan: 'Keuangan',
-          operasional: 'Operasional'
+          operasional: 'Operasional',
+    it: 'IT'
         };
         const divLabel = divisionLabels[currentUser.division] || '';
         sidebarName.textContent = toTitleCase(currentUser.display_name) + (divLabel ? ` (${divLabel})` : '');

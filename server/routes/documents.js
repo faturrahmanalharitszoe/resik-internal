@@ -48,7 +48,8 @@ router.get('/recipients', async (req, res) => {
       marketing: 'Marketing',
       sdm: 'SDM',
       keuangan: 'Keuangan',
-      operasional: 'Operasional'
+      operasional: 'Operasional',
+    it: 'IT'
     };
     const jabatanLabels = {
       'SM': 'Senior Manager',
@@ -139,7 +140,8 @@ router.get('/counts', async (req, res) => {
       paramsIn = [division, [...subDivs, division]];
     } else {
       const userGroups = [displayName];
-      const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional' };
+      const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+    it: 'IT' };
       const mappedDiv = divisionLabels[division] || division;
       const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
       const userLevel = jabatanHierarchy.indexOf(jabatan);
@@ -256,7 +258,8 @@ router.get('/', async (req, res) => {
         marketing: 'Marketing',
         sdm: 'SDM',
         keuangan: 'Keuangan',
-        operasional: 'Operasional'
+        operasional: 'Operasional',
+    it: 'IT'
       };
       const mappedDiv = divisionLabels[division] || division;
 
@@ -544,7 +547,8 @@ async function checkDocumentAccess(doc, user) {
     marketing: 'Marketing',
     sdm: 'SDM',
     keuangan: 'Keuangan',
-    operasional: 'Operasional'
+    operasional: 'Operasional',
+    it: 'IT'
   };
   const mappedDiv = divisionLabels[division] || division;
   const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'SM', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];

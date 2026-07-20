@@ -338,6 +338,19 @@ async function runMigrations() {
       );
     `);
 
+    // notifications table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        document_id UUID REFERENCES shared_documents(id) ON DELETE CASCADE,
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     console.log('✅ Migrasi database selesai.');
   } catch (err) {
     console.error('❌ Gagal menjalankan migrasi database:', err);

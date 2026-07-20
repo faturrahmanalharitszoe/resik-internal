@@ -574,39 +574,35 @@ function connectSocket() {
     typingIndicator.classList.toggle('hidden', !is_typing);
   });
 
-  socket.on('new_document_assigned', (doc) => {
-    // Only show if the user's groups match the document's penerima
-    const recipients = (doc.penerima || '').split(',').map(r => r.trim());
-    if (userGroups && userGroups.some(g => recipients.includes(g)) && doc.user_id !== currentUser.id) {
-      // In-App Bell update
-      const badge = $('notification-badge');
-      if (badge) {
-        let count = parseInt(badge.textContent) || 0;
-        badge.textContent = count + 1;
-        badge.classList.remove('hidden');
+  socket.on('new_persistent_notification', (notif) => {
+    // In-App Bell update
+    const badge = $('notification-badge');
+    if (badge) {
+      let count = parseInt(badge.textContent) || 0;
+      badge.textContent = count + 1;
+      badge.classList.remove('hidden');
+    }
+    showCustomAlert(`Dokumen Baru: ${notif.document_name} telah dibagikan ke divisi Anda.`);
+    
+    // Update Dropdown List
+    const listContainer = $('notification-list');
+    if (listContainer) {
+      // Remove empty state message if it exists
+      if (listContainer.innerHTML.includes('Belum ada notifikasi baru')) {
+        listContainer.innerHTML = '';
       }
-      showCustomAlert(`Dokumen Baru: ${doc.document_name} telah dibagikan ke divisi Anda.`);
       
-      // Update Dropdown List
-      const listContainer = $('notification-list');
-      if (listContainer) {
-        // Remove empty state message if it exists
-        if (listContainer.innerHTML.includes('Belum ada notifikasi baru')) {
-          listContainer.innerHTML = '';
-        }
-        
-        const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-        const itemHtml = `
-          <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="loadSharedDocuments(); switchView('sharing'); document.getElementById('notification-dropdown').classList.add('hidden');">
-            <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">Dokumen Baru: ${esc(doc.document_name)}</div>
-            <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
-              <span>Dari: ${esc(doc.sender_name || 'Sistem')}</span>
-              <span>${time}</span>
-            </div>
+      const time = new Date(notif.created_at || new Date()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const itemHtml = `
+        <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
+          <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">${esc(notif.message)}</div>
+          <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
+            <span>Dari: ${esc(notif.sender_name || 'Sistem')}</span>
+            <span>${time}</span>
           </div>
-        `;
-        listContainer.insertAdjacentHTML('afterbegin', itemHtml);
-      }
+        </div>
+      `;
+      listContainer.insertAdjacentHTML('afterbegin', itemHtml);
     }
   });
 
@@ -1073,6 +1069,7 @@ async function showApp() {
   await loadUsers();
   initSharingEvents();
   await loadNotionWorkspace();
+  await loadNotifications();
   switchSidebarTab('chat', false);
 }
 
@@ -5044,6 +5041,84 @@ async function registerAndSubscribePush() {
   }
 }
 
+/* --- Persistent Notifications Logic --- */
+async function loadNotifications() {
+  const badge = $('notification-badge');
+  const listContainer = $('notification-list');
+  if (!badge || !listContainer) return;
+
+  try {
+    const notifs = await apiFetch('/api/notifications');
+    if (!notifs) return;
+
+    if (notifs.length > 0) {
+      badge.textContent = notifs.length;
+      badge.classList.remove('hidden');
+      
+      let html = '';
+      notifs.forEach(notif => {
+        const time = new Date(notif.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        html += `
+          <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">${esc(notif.message)}</div>
+            <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
+              <span>Dari: ${esc(notif.sender_name || 'Sistem')}</span>
+              <span>${time}</span>
+            </div>
+          </div>
+        `;
+      });
+      listContainer.innerHTML = html;
+    } else {
+      badge.textContent = '0';
+      badge.classList.add('hidden');
+      listContainer.innerHTML = '<div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px;">Belum ada notifikasi baru</div>';
+    }
+  } catch (err) {
+    console.error('Failed to load notifications', err);
+  }
+}
+
+async function markNotificationAsRead(id) {
+  try {
+    await fetch(\`/api/notifications/\${id}/read\`, {
+      method: 'PUT',
+      headers: { 'Authorization': \`Bearer \${token}\` }
+    });
+    
+    // Remove from UI
+    const el = \`notif-item-\${id}\`;
+    if ($(el)) {
+      $(el).remove();
+    }
+    
+    // Decrease badge count
+    const badge = $('notification-badge');
+    if (badge) {
+      let count = parseInt(badge.textContent) || 0;
+      if (count > 1) {
+        badge.textContent = count - 1;
+      } else {
+        badge.textContent = '0';
+        badge.classList.add('hidden');
+        const listContainer = $('notification-list');
+        if (listContainer) {
+          listContainer.innerHTML = '<div style="padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 13px;">Belum ada notifikasi baru</div>';
+        }
+      }
+    }
+    
+    // Close dropdown & navigate
+    const dropdown = $('notification-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+    loadSharedDocuments();
+    switchView('sharing');
+    
+  } catch (err) {
+    console.error('Error marking notification read', err);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const btnAllowPush = $('btn-allow-push');
   if (btnAllowPush) {
@@ -5063,17 +5138,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Clear notification badge on click and toggle dropdown
+  // Toggle dropdown on bell click
   const btnBell = $('btn-notifications');
   const dropdown = $('notification-dropdown');
   if (btnBell && dropdown) {
     btnBell.addEventListener('click', (e) => {
       e.stopPropagation();
-      const badge = $('notification-badge');
-      if (badge) {
-        badge.textContent = '0';
-        badge.classList.add('hidden');
-      }
       dropdown.classList.toggle('hidden');
     });
 

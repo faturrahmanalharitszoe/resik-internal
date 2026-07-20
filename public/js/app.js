@@ -553,201 +553,6 @@ function sendMessage() {
 }
 
 /* ─── SOCKET ─── */
-    $('register-error').textContent = err.message;
-  }
-});
-
-/* ─── LOGOUT ─── */
-$('btn-logout').addEventListener('click', () => {
-  localStorage.removeItem('chat_token');
-  localStorage.removeItem('chat_user');
-  if (socket) socket.disconnect();
-  location.reload();
-});
-
-/* ─── COLLAPSIBLE SIDEBAR & THEME EVENTS ─── */
-if ($('theme-toggle-btn')) {
-  $('theme-toggle-btn').addEventListener('click', () => {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('theme', newTheme);
-    applyTheme(newTheme);
-  });
-}
-
-window.toggleSidebar = () => {
-  const appEl = $('app');
-  if (!appEl) return;
-  const willCollapse = !appEl.classList.contains('sidebar-collapsed');
-  appEl.classList.toggle('sidebar-collapsed', willCollapse);
-  localStorage.setItem('sidebar_collapsed', willCollapse ? 'true' : 'false');
-};
-
-// Wire up all hamburger sidebar-toggle buttons (collapse from sidebar header + expand from content headers)
-['btn-sidebar-collapse', 'empty-sidebar-toggle', 'chat-sidebar-toggle',
-  'sharing-sidebar-toggle', 'notion-sidebar-toggle', 'admin-sidebar-toggle'].forEach(id => {
-    const btn = $(id);
-    if (btn) btn.addEventListener('click', toggleSidebar);
-  });
-
-function switchSidebarTab(tabName, autoExpand = true) {
-  // Update active state in UI
-  document.querySelectorAll('.activity-tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.id === `tab-btn-${tabName}`);
-  });
-
-  // Toggle visibility of sidebar sections
-  const menuSection = document.querySelector('.menu-section');
-  const notionSection = document.querySelector('.notion-section');
-  const roomsSection = document.querySelector('.rooms-section');
-  const usersSection = document.querySelector('.users-section');
-  const adminSection = document.querySelector('.admin-section');
-
-  if (menuSection) menuSection.classList.toggle('hidden', tabName !== 'files');
-  if (notionSection) notionSection.classList.toggle('hidden', tabName !== 'notion');
-  if (roomsSection) roomsSection.classList.toggle('hidden', tabName !== 'chat');
-  if (usersSection) usersSection.classList.toggle('hidden', tabName !== 'chat');
-  if (adminSection) adminSection.classList.toggle('hidden', tabName !== 'admin');
-
-  // Handle auto expansion of collapsed sidebar
-  if (autoExpand) {
-    const appEl = $('app');
-    if (appEl && appEl.classList.contains('sidebar-collapsed')) {
-      toggleSidebar();
-    }
-  }
-
-  // Prevent infinite loop by checking currentView before switching
-  if (tabName === 'files' && currentView !== 'sharing') {
-    switchView('sharing');
-  } else if (tabName === 'notion' && currentView !== 'notion' && currentView !== 'notion-calendar') {
-    if (currentNotionPageId) {
-      switchView('notion');
-    } else {
-      switchView('notion-calendar');
-    }
-  } else if (tabName === 'chat' && currentView !== 'chat') {
-    switchView('chat');
-  } else if (tabName === 'admin' && currentView !== 'admin') {
-    switchView('admin');
-  }
-}
-window.switchSidebarTab = switchSidebarTab;
-
-
-if ($('toggle-rooms-btn')) {
-  $('toggle-rooms-btn').addEventListener('click', (e) => {
-    if (e.target.id === 'btn-new-room') return;
-    const roomList = $('room-list');
-    if (!roomList) return;
-    const isHidden = roomList.classList.toggle('hidden');
-    const arrow = $('toggle-rooms-btn').querySelector('.toggle-arrow');
-    if (arrow) {
-      arrow.textContent = isHidden ? '▸' : '▾';
-    }
-  });
-}
-
-if ($('toggle-users-btn')) {
-  $('toggle-users-btn').addEventListener('click', () => {
-    const userList = $('user-list');
-    if (!userList) return;
-    const isHidden = userList.classList.toggle('hidden');
-    const arrow = $('toggle-users-btn').querySelector('.toggle-arrow');
-    if (arrow) {
-      arrow.textContent = isHidden ? '▸' : '▾';
-    }
-  });
-}
-
-if ($('side-peek-close-btn')) {
-  $('side-peek-close-btn').addEventListener('click', () => {
-    $('side-peek-backdrop').classList.add('hidden');
-    $('side-peek-panel').classList.remove('open');
-  });
-}
-
-if ($('side-peek-backdrop')) {
-  $('side-peek-backdrop').addEventListener('click', () => {
-    $('side-peek-backdrop').classList.add('hidden');
-    $('side-peek-panel').classList.remove('open');
-  });
-}
-
-/* ─── MODAL: NEW ROOM ─── */
-if ($('btn-new-room')) {
-  $('btn-new-room').addEventListener('click', () => modalOverlay.classList.remove('hidden'));
-}
-if ($('modal-close')) {
-  $('modal-close').addEventListener('click', () => modalOverlay.classList.add('hidden'));
-}
-
-$('btn-create-room').addEventListener('click', async () => {
-  const name = $('new-room-name').value.trim();
-  if (!name) return;
-  try {
-    const res = await apiFetch('/api/rooms', { method: 'POST', body: { name } });
-    if (res) {
-      modalOverlay.classList.add('hidden');
-      $('new-room-name').value = '';
-      await loadRooms();
-    }
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-/* ─── SEND MESSAGE ─── */
-if ($('btn-send')) {
-  $('btn-send').addEventListener('click', sendMessage);
-}
-
-if (messageInput) {
-  messageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  let isTyping = false;
-  let typingThrottle = null;
-
-  messageInput.addEventListener('input', () => {
-    // Auto-resize
-    messageInput.style.height = 'auto';
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + 'px';
-
-    // Typing indicator — throttled so only fires once per 300ms
-    if (!currentRoomId) return;
-    if (!isTyping) {
-      isTyping = true;
-      socket.emit('typing', { room_id: currentRoomId, is_typing: true });
-    }
-    clearTimeout(typingThrottle);
-    clearTimeout(typingTimer);
-    typingThrottle = null;
-    typingTimer = setTimeout(() => {
-      isTyping = false;
-      socket.emit('typing', { room_id: currentRoomId, is_typing: false });
-    }, 1500);
-  });
-}
-
-function sendMessage() {
-  const content = messageInput.value.trim();
-  if (!content || !currentRoomId) return;
-
-  socket.emit('send_message', { room_id: currentRoomId, content }, (res) => {
-    if (res?.error) console.error(res.error);
-  });
-
-  messageInput.value = '';
-  messageInput.style.height = 'auto';
-  socket.emit('typing', { room_id: currentRoomId, is_typing: false });
-}
-
-/* ─── SOCKET ─── */
 function connectSocket() {
   socket = io({ auth: { token } });
 
@@ -5048,6 +4853,103 @@ async function handleAdminUserSubmit(e) {
           sdm: 'SDM',
           keuangan: 'Keuangan',
           operasional: 'Operasional',
+    it: 'IT'
+        };
+        const divLabel = divisionLabels[currentUser.division] || '';
+        sidebarName.textContent = toTitleCase(currentUser.display_name) + (divLabel ? ` (${divLabel})` : '');
+
+        // If revoked admin status, force reload
+        if (!is_admin && role !== 'admin') {
+          location.reload();
+        }
+      }
+    }
+  } else {
+    errorEl.textContent = 'Gagal menyimpan data pengguna. Username atau email mungkin sudah terdaftar.';
+  }
+}
+window.handleAdminUserSubmit = handleAdminUserSubmit;
+
+// Open Reset Password Modal
+function openAdminResetPwdModal(userId) {
+  $('admin-reset-pwd-user-id').value = userId;
+  $('admin-reset-pwd-password').value = '';
+  $('admin-reset-pwd-error').textContent = '';
+  $('modal-admin-reset-pwd-overlay').classList.remove('hidden');
+}
+window.openAdminResetPwdModal = openAdminResetPwdModal;
+
+// Close Reset Password Modal
+function closeAdminResetPwdModal() {
+  $('modal-admin-reset-pwd-overlay').classList.add('hidden');
+}
+window.closeAdminResetPwdModal = closeAdminResetPwdModal;
+
+// Submit Reset Password Form
+async function handleAdminResetPwdSubmit(e) {
+  e.preventDefault();
+
+  const userId = $('admin-reset-pwd-user-id').value;
+  const password = $('admin-reset-pwd-password').value;
+  const errorEl = $('admin-reset-pwd-error');
+
+  errorEl.textContent = '';
+
+  if (password.length < 6) {
+    errorEl.textContent = 'Password minimal 6 karakter';
+    return;
+  }
+
+  const res = await apiFetch(`/api/admin/users/${userId}/password`, {
+    method: 'PUT',
+    body: { password }
+  });
+
+  if (res) {
+    if (res.error) {
+      errorEl.textContent = res.error;
+    } else {
+      closeAdminResetPwdModal();
+      alert('Password pengguna berhasil diperbarui!');
+    }
+  } else {
+    errorEl.textContent = 'Gagal memperbarui password pengguna.';
+  }
+}
+window.handleAdminResetPwdSubmit = handleAdminResetPwdSubmit;
+
+// Delete User
+async function deleteAdminUser(userId) {
+  if (userId === currentUser.id) {
+    alert('Anda tidak dapat menghapus akun Anda sendiri!');
+    return;
+  }
+
+  const user = adminUsersList.find(u => u.id === userId);
+  const name = user ? user.display_name : 'pengguna ini';
+
+  if (!confirm(`Apakah Anda yakin ingin menghapus akun ${name}? Seluruh data pesan dan dokumen yang dikirim oleh pengguna ini akan tetap ada, namun akun akan dihapus dari sistem.`)) {
+    return;
+  }
+
+  const res = await apiFetch(`/api/admin/users/${userId}`, {
+    method: 'DELETE'
+  });
+
+  if (res) {
+    if (res.error) {
+      alert(res.error);
+    } else {
+      await loadAdminUsers();
+    }
+  } else {
+    alert('Gagal menghapus pengguna.');
+  }
+}
+window.deleteAdminUser = deleteAdminUser;
+
+// Toggle Stats Summary Section in Sharing Folder
+function toggleStatsSection() {
   const grid = $('stats-collapsible-grid');
   const chevron = $('stats-toggle-chevron');
   if (!grid) return;
@@ -5060,5 +4962,98 @@ async function handleAdminUserSubmit(e) {
   localStorage.setItem('stats_collapsed', isCollapsed ? 'true' : 'false');
 }
 window.toggleStatsSection = toggleStatsSection;
+
+/* --- Mandatory Web Push Logic --- */
+let vapidPublicKey = null;
+
+async function checkNotificationPermission() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  
+  const permission = Notification.permission;
+  const overlay = $('mandatory-push-overlay');
+  if (!overlay) return;
+
+  if (permission === 'granted') {
+    overlay.classList.add('hidden');
+    await registerAndSubscribePush();
+  } else {
+    // Show mandatory overlay if default or denied
+    overlay.classList.remove('hidden');
+  }
+}
+
+async function registerAndSubscribePush() {
+  try {
+    const swReg = await navigator.serviceWorker.register('/sw.js');
+    if (!vapidPublicKey) {
+      const res = await fetch('/api/notifications/vapidPublicKey', { headers: { 'Authorization': `Bearer ${token}` } });
+      vapidPublicKey = await res.text();
+    }
+    
+    // Convert VAPID key
+    const padding = '='.repeat((4 - vapidPublicKey.length % 4) % 4);
+    const base64 = (vapidPublicKey + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+
+    const subscription = await swReg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: outputArray
+    });
+
+    await fetch('/api/notifications/subscribe', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(subscription)
+    });
+  } catch (err) {
+    console.error('Failed to subscribe to push notifications', err);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btnAllowPush = $('btn-allow-push');
+  if (btnAllowPush) {
+    btnAllowPush.addEventListener('click', async () => {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          $('mandatory-push-overlay').classList.add('hidden');
+          $('push-error-msg').classList.add('hidden');
+          await registerAndSubscribePush();
+        } else {
+          $('push-error-msg').classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error('Error requesting permission', err);
+      }
+    });
+  }
+  
+  // Clear notification badge on click
+  const btnBell = $('btn-notifications');
+  if (btnBell) {
+    btnBell.addEventListener('click', () => {
+      const badge = $('notification-badge');
+      if (badge) {
+        badge.textContent = '0';
+        badge.classList.add('hidden');
+      }
+      loadDocuments();
+      switchView('sharing');
+    });
+  }
+});
+
+// Call check on startup if already logged in (token exists)
+if (token) {
+  checkNotificationPermission();
+}
 
 

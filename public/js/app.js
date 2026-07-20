@@ -5081,13 +5081,13 @@ async function loadNotifications() {
 
 async function markNotificationAsRead(id) {
   try {
-    await fetch(\`/api/notifications/\${id}/read\`, {
+    await fetch(`/api/notifications/${id}/read`, {
       method: 'PUT',
-      headers: { 'Authorization': \`Bearer \${token}\` }
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     
     // Remove from UI
-    const el = \`notif-item-\${id}\`;
+    const el = `notif-item-${id}`;
     if ($(el)) {
       $(el).remove();
     }

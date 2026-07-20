@@ -2148,7 +2148,9 @@ async function uploadDocSubmit(e) {
   formData.append('senderName', currentUser.display_name);
   formData.append('senderDivision', currentUser.division);
   formData.append('userId', currentUser.id);
-  formData.append('tgl', $('upload-doc-date').value);
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  formData.append('tgl', `${$('upload-doc-date').value} ${timeStr}`);
 
   try {
     const res = await fetch(`${API}/api/documents/submit_document`, {
@@ -2186,6 +2188,12 @@ async function editDocSubmit(e) {
     return;
   }
 
+  let timeStr = $('edit-doc-date').dataset.time;
+  if (!timeStr) {
+    const now = new Date();
+    timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  }
+
   const body = {
     id: docId,
     project_name: $('edit-project-name').value,
@@ -2195,7 +2203,7 @@ async function editDocSubmit(e) {
     document_name: $('edit-doc-name').value.trim(),
     description: $('edit-description').value.trim(),
     penerima: JSON.stringify(resolvedRecipients),
-    tgl: $('edit-doc-date').value
+    tgl: `${$('edit-doc-date').value} ${timeStr}`
   };
 
   try {
@@ -2237,8 +2245,10 @@ function openEditModal(docId) {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     $('edit-doc-date').value = `${year}-${month}-${day}`;
+    $('edit-doc-date').dataset.time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
   } else {
     $('edit-doc-date').value = '';
+    $('edit-doc-date').dataset.time = '';
   }
 
   renderRecipientSelectors();

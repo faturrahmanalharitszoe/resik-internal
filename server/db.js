@@ -326,6 +326,18 @@ async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_document_views_doc_id ON document_views(document_id);
     `);
 
+    // push_subscriptions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh VARCHAR(255) NOT NULL,
+        auth VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     console.log('✅ Migrasi database selesai.');
   } catch (err) {
     console.error('❌ Gagal menjalankan migrasi database:', err);

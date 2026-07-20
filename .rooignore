@@ -1,0 +1,23 @@
+# Dependencies & build
+node_modules/
+vendor/
+dist/
+build/
+
+# Temporary/scratch files
+tmp_*.txt
+tmp_*.log
+
+# Data files (kalau ga perlu di-context-in AI)
+*.csv
+*.sql
+
+# Version control
+.git/
+
+# Environment & secrets
+.env
+.env.*
+
+# Logs
+*.log

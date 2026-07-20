@@ -51,6 +51,7 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/notion', require('./routes/notion'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -63,6 +64,9 @@ app.get('*', (req, res) => {
 // Socket.IO auth + handler
 io.use(socketAuth);
 setupSocket(io);
+
+// Make io accessible to routers
+app.set('io', io);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, async () => {

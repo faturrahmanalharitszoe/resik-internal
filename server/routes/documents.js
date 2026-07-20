@@ -50,7 +50,7 @@ router.get('/recipients', async (req, res) => {
       sdm: 'SDM',
       keuangan: 'Keuangan',
       operasional: 'Operasional',
-    it: 'IT'
+      it: 'IT'
     };
     const jabatanLabels = {
       'SM': 'Senior Manager',
@@ -141,8 +141,10 @@ router.get('/counts', async (req, res) => {
       paramsIn = [division, [...subDivs, division]];
     } else {
       const userGroups = [displayName];
-      const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
-    it: 'IT' };
+      const divisionLabels = {
+        marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+        it: 'IT'
+      };
       const mappedDiv = divisionLabels[division] || division;
       const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
       const userLevel = jabatanHierarchy.indexOf(jabatan);
@@ -260,7 +262,7 @@ router.get('/', async (req, res) => {
         sdm: 'SDM',
         keuangan: 'Keuangan',
         operasional: 'Operasional',
-    it: 'IT'
+        it: 'IT'
       };
       const mappedDiv = divisionLabels[division] || division;
 
@@ -417,7 +419,7 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
         const usersRes = await db.query("SELECT * FROM users");
         const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
         const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
-        
+
         const targetUserIds = [];
         for (const u of usersRes.rows) {
           const userGroups = [u.display_name];
@@ -457,7 +459,7 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
             );
             insertedNotifs.push(notifRes.rows[0]);
           }
-          
+
           // Emit socket event with notification ID so frontend can track it
           const io = req.app.get('io');
           if (io) {
@@ -472,7 +474,7 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
 
           // 3. Fetch push subscriptions
           const subsRes = await db.query("SELECT * FROM push_subscriptions WHERE user_id = ANY($1)", [targetUserIds]);
-          
+
           const payload = JSON.stringify({
             title: 'Dokumen Baru Diterima',
             body: `Dokumen ${newDoc.document_name} (${newDoc.document_type}) telah dibagikan ke divisi Anda oleh ${newDoc.sender_name}.`,
@@ -825,30 +827,30 @@ router.post('/bulk_delete', async (req, res) => {
       return res.status(400).json({ error: 'Tidak ada dokumen yang dipilih' });
     }
     const user = req.user;
-    
+
     let deletedCount = 0;
-    
+
     for (const id of ids) {
       const docResult = await db.query('SELECT * FROM shared_documents WHERE id = $1', [id]);
       if (docResult.rows.length === 0) continue;
-      
+
       const doc = docResult.rows[0];
-      
+
       // Only owner, top management, or admin can delete
       if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin && user.username !== 'admin' && user.username !== 'administrator') {
         continue;
       }
-      
+
       // Delete physical file
       const filePath = path.join(__dirname, '../..', doc.file_path);
       if (fs.existsSync(filePath)) {
         try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting file:', e); }
       }
-      
+
       await db.query('DELETE FROM shared_documents WHERE id = $1', [id]);
       deletedCount++;
     }
-    
+
     res.json({ message: 'Dokumen berhasil dihapus', deletedCount });
   } catch (err) {
     console.error('Error bulk deleting documents:', err);

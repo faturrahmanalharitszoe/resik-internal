@@ -448,18 +448,20 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
 
         if (targetUserIds.length > 0) {
           // 2. Insert notifications to DB
-          const insertNotifsQuery = `
-            INSERT INTO notifications (user_id, sender_id, document_id, message)
-            SELECT unnest($1::uuid[]), $2, $3, $4
-            RETURNING *
-          `;
           const notifMsg = `Dokumen Baru: ${newDoc.document_name}`;
-          const notifRes = await db.query(insertNotifsQuery, [targetUserIds, req.user.id, newDoc.id, notifMsg]);
+          const insertedNotifs = [];
+          for (const uid of targetUserIds) {
+            const notifRes = await db.query(
+              'INSERT INTO notifications (user_id, sender_id, document_id, message) VALUES ($1, $2, $3, $4) RETURNING *',
+              [uid, req.user.id, newDoc.id, notifMsg]
+            );
+            insertedNotifs.push(notifRes.rows[0]);
+          }
           
           // Emit socket event with notification ID so frontend can track it
           const io = req.app.get('io');
           if (io) {
-            notifRes.rows.forEach(notif => {
+            insertedNotifs.forEach(notif => {
               io.to(`user_${notif.user_id}`).emit('new_persistent_notification', {
                 ...notif,
                 sender_name: newDoc.sender_name,

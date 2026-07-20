@@ -583,7 +583,7 @@ function connectSocket() {
       badge.classList.remove('hidden');
     }
     showCustomAlert(`Dokumen Baru: ${notif.document_name} telah dibagikan ke divisi Anda.`);
-    
+
     // Update Dropdown List
     const listContainer = $('notification-list');
     if (listContainer) {
@@ -591,7 +591,7 @@ function connectSocket() {
       if (listContainer.innerHTML.includes('Belum ada notifikasi baru')) {
         listContainer.innerHTML = '';
       }
-      
+
       const time = new Date(notif.created_at || new Date()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       const itemHtml = `
         <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
@@ -5054,7 +5054,7 @@ async function loadNotifications() {
     if (notifs.length > 0) {
       badge.textContent = notifs.length;
       badge.classList.remove('hidden');
-      
+
       let html = '';
       notifs.forEach(notif => {
         const time = new Date(notif.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -5085,13 +5085,13 @@ async function markNotificationAsRead(id) {
       method: 'PUT',
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    
+
     // Remove from UI
     const el = `notif-item-${id}`;
     if ($(el)) {
       $(el).remove();
     }
-    
+
     // Decrease badge count
     const badge = $('notification-badge');
     if (badge) {
@@ -5107,13 +5107,13 @@ async function markNotificationAsRead(id) {
         }
       }
     }
-    
+
     // Close dropdown & navigate
     const dropdown = $('notification-dropdown');
     if (dropdown) dropdown.classList.add('hidden');
     loadSharedDocuments();
     switchView('sharing');
-    
+
   } catch (err) {
     console.error('Error marking notification read', err);
   }

@@ -729,7 +729,7 @@ function renderUsers() {
       sdm: 'SDM',
       keuangan: 'Keuangan',
       operasional: 'Operasional',
-    it: 'IT',
+      it: 'IT',
       it: 'IT'
     };
 
@@ -1974,23 +1974,23 @@ async function bulkDelete() {
   if (selectedDocIds.size === 0) return;
   const confirmed = await showCustomConfirm(`Hapus ${selectedDocIds.size} dokumen secara permanen? File juga akan ikut terhapus.`);
   if (!confirmed) return;
-  
+
   try {
     const res = await fetch(`${API}/api/documents/bulk_delete`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ ids: Array.from(selectedDocIds) })
     });
     const data = await res.json();
-    
-    if (!res.ok) { 
-      showCustomAlert(data.error || 'Gagal menghapus dokumen'); 
-      return; 
+
+    if (!res.ok) {
+      showCustomAlert(data.error || 'Gagal menghapus dokumen');
+      return;
     }
-    
+
     showCustomAlert(`${data.deletedCount} dokumen berhasil dihapus!`);
     clearBulkSelection();
     await loadSharedDocuments();
@@ -2027,7 +2027,7 @@ function previewDocument(docId, filename, docName) {
   if (docId) {
     apiFetch(`/api/documents/${docId}/view`, { method: 'POST' }).catch(() => { });
   }
-  
+
   const url = `preview.html?id=${docId}&file=${encodeURIComponent(filename)}&name=${encodeURIComponent(docName || filename)}`;
   window.open(url, '_blank');
 }
@@ -2427,8 +2427,10 @@ function openDetailModal(docId) {
           hour: '2-digit', minute: '2-digit'
         });
         const jabDiv = [v.viewer_jabatan, v.viewer_division ? (
-          { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
-    it: 'IT' }[v.viewer_division] || v.viewer_division
+          {
+            marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+            it: 'IT'
+          }[v.viewer_division] || v.viewer_division
         ) : null].filter(Boolean).join(' · ');
         return `
           <div style="display:flex; align-items:flex-start; gap:8px; padding:6px 8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
@@ -4522,8 +4524,10 @@ function renderMembersPanel() {
     li.className = 'member-item';
 
     const statusClass = member.is_online ? 'online' : 'offline';
-    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
-    it: 'IT', it: 'IT' };
+    const divisionLabels = {
+      marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+      it: 'IT', it: 'IT'
+    };
     const divLabel = divisionLabels[member.division] || '';
     const creatorBadge = member.is_creator ? '<span class="creator-badge">Pembuat</span>' : '';
 
@@ -4610,8 +4614,10 @@ function renderAddMemberList() {
   available.forEach((user) => {
     const li = document.createElement('li');
     li.className = 'add-member-item';
-    const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
-    it: 'IT', it: 'IT' };
+    const divisionLabels = {
+      marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+      it: 'IT', it: 'IT'
+    };
     const divLabel = divisionLabels[user.division] || '';
 
     li.innerHTML = `
@@ -4853,7 +4859,7 @@ async function handleAdminUserSubmit(e) {
           sdm: 'SDM',
           keuangan: 'Keuangan',
           operasional: 'Operasional',
-    it: 'IT'
+          it: 'IT'
         };
         const divLabel = divisionLabels[currentUser.division] || '';
         sidebarName.textContent = toTitleCase(currentUser.display_name) + (divLabel ? ` (${divLabel})` : '');
@@ -4968,7 +4974,7 @@ let vapidPublicKey = null;
 
 async function checkNotificationPermission() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-  
+
   const permission = Notification.permission;
   const overlay = $('mandatory-push-overlay');
   if (!overlay) return;
@@ -4989,7 +4995,7 @@ async function registerAndSubscribePush() {
       const res = await fetch('/api/notifications/vapidPublicKey', { headers: { 'Authorization': `Bearer ${token}` } });
       vapidPublicKey = await res.text();
     }
-    
+
     // Convert VAPID key
     const padding = '='.repeat((4 - vapidPublicKey.length % 4) % 4);
     const base64 = (vapidPublicKey + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -5006,7 +5012,7 @@ async function registerAndSubscribePush() {
 
     await fetch('/api/notifications/subscribe', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
@@ -5035,7 +5041,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  
+
   // Clear notification badge on click
   const btnBell = $('btn-notifications');
   if (btnBell) {
@@ -5045,8 +5051,6 @@ document.addEventListener('DOMContentLoaded', () => {
         badge.textContent = '0';
         badge.classList.add('hidden');
       }
-      loadSharedDocuments();
-      switchView('sharing');
     });
   }
 });

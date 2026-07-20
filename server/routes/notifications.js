@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const auth = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 
 // GET /api/notifications/vapidPublicKey
 router.get('/vapidPublicKey', (req, res) => {
@@ -9,7 +9,7 @@ router.get('/vapidPublicKey', (req, res) => {
 });
 
 // POST /api/notifications/subscribe
-router.post('/subscribe', auth, async (req, res) => {
+router.post('/subscribe', authMiddleware, async (req, res) => {
   try {
     const subscription = req.body;
     const userId = req.user.id;

@@ -260,6 +260,228 @@ router.get('/', async (req, res) => {
         sdm: 'SDM',
         keuangan: 'Keuangan',
         operasional: 'Operasional',
+    it: 'IT'
+      };
+      const mappedDiv = divisionLabels[division] || division;
+
+      // Jabatan hierarchy: higher index = higher level
+      const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
+      const userLevel = jabatanHierarchy.indexOf(jabatan);
+
+      if (mappedDiv) {
+        // Always include own division group and own jabatan+divisi combo
+        userGroups.push('Divisi ' + mappedDiv);
+        if (jabatan) {
+          userGroups.push(jabatan + ' ' + mappedDiv);
+        }
+        // If user is above Staff level, also include all lower jabatan+divisi combos in same division
+        if (userLevel > 0) {
+          jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
+            userGroups.push(lowerJab + ' ' + mappedDiv);
+          });
+        }
+      }
+
+      if (jabatan === 'Direktur Umum') {
+        userGroups.push('Direktur Umum');
+      } else if (jabatan === 'Wakil Direktur' || jabatan === 'Wakil Direktur Utama') {
+        userGroups.push('Wakil Direktur');
+        userGroups.push('Wakil Direktur Utama');
+      } else if (jabatan === 'Direktur') {
+        userGroups.push('Direktur');
+      } else if (jabatan === 'SM' || jabatan === 'Senior Manager') {
+        userGroups.push('Semua SM');
+        userGroups.push('Semua Senior Manager');
+      } else if (jabatan === 'Staff') {
+        userGroups.push('Semua Staff');
+      }
+
+      query = `
+        SELECT d.*, COALESCE(d.sender_division, u.division) AS sender_division
+        FROM shared_documents d
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE d.sender_name = $1
+           OR EXISTS (
+             SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec
+             WHERE rec = ANY($2::text[])
+           )
+        ORDER BY d.tgl DESC
+      `;
+      params = [displayName, userGroups];
+    }
+
+    const result = await db.query(query, params);
+
+    // Map database field names to what frontend expects
+    const mappedDocs = result.rows.map(row => ({
+      id: row.id,
+      project_name: row.project_name,
+      document_type: row.document_type,
+      sub_tipe: row.sub_tipe,
+      document_name: row.document_name,
+      document_number: row.document_number,
+      description: row.description,
+      file: row.file_path,
+      senderName: row.sender_name,
+      senderDivision: row.sender_division,
+      penerima: row.penerima,
+      tgl: row.tgl,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    }));
+
+    res.json(mappedDocs);
+  } catch (err) {
+    console.error('Error fetching documents:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// POST /api/documents/submit_document
+router.post('/submit_document', upload.single('file'), async (req, res) => {
+  try {
+    const { project_name, document_type, sub_tipe, document_name, document_number, description, penerima, senderName, senderDivision, userId, tgl } = req.body;
+
+    if (!document_type || !document_number) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Document type and document number are required' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'File upload is required' });
+    }
+
+    // Server-side validation: Staff cannot upload 'Kontrak'
+    if (document_type.toLowerCase() === 'kontrak' && req.user.role === 'staff' && !req.user.is_admin) {
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({ error: 'Staf biasa tidak diperbolehkan mengunggah dokumen tipe Kontrak' });
+    }
+
+    let recipientsArray = [];
+    if (penerima) {
+      try {
+        recipientsArray = JSON.parse(penerima);
+      } catch (e) {
+        if (typeof penerima === 'string') {
+          recipientsArray = penerima.split(',').map(r => r.trim());
+        }
+      }
+    }
+    const penerimaString = recipientsArray.join(',');
+
+    const filePath = '/uploads/' + req.file.filename;
+
+    const insertQuery = tgl
+      ? `INSERT INTO shared_documents 
+         (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, tgl)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING *`
+      : `INSERT INTO shared_documents 
+         (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         RETURNING *`;
+
+    const queryParams = [
+      project_name,
+      document_type,
+      sub_tipe || '',
+      document_name || '',
+      document_number,
+      description || '',
+      filePath,
+      senderName || req.user.display_name,
+      senderDivision || req.user.division,
+      userId || req.user.id,
+      penerimaString
+    ];
+    if (tgl) {
+      queryParams.push(tgl);
+    }
+
+    const result = await db.query(insertQuery, queryParams);
+    const newDoc = result.rows[0];
+
+    // Trigger In-App Notification (Socket.io)
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('new_document_assigned', newDoc);
+    }
+
+    // Trigger Web Push Notifications (Background)
+    (async () => {
+      try {
+        const recipientsArray = (penerimaString || '').split(',').map(r => r.trim());
+        if (recipientsArray.length === 0) return;
+
+        // 1. Fetch all users and find who should get this
+        const usersRes = await db.query("SELECT * FROM users");
+        const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
+        const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
+        
+        const targetUserIds = [];
+        for (const u of usersRes.rows) {
+          const userGroups = [u.display_name];
+          const mappedDiv = divisionLabels[u.division] || u.division;
+          const userLevel = jabatanHierarchy.indexOf(u.jabatan);
+
+          if (mappedDiv) {
+            userGroups.push('Divisi ' + mappedDiv);
+            if (u.jabatan) userGroups.push(u.jabatan + ' ' + mappedDiv);
+            if (userLevel > 0) {
+              jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
+                userGroups.push(lowerJab + ' ' + mappedDiv);
+              });
+            }
+          }
+          if (u.jabatan === 'Direktur Umum') userGroups.push('Direktur Umum');
+          else if (u.jabatan === 'Wakil Direktur' || u.jabatan === 'Wakil Direktur Utama') { userGroups.push('Wakil Direktur', 'Wakil Direktur Utama'); }
+          else if (u.jabatan === 'Direktur') userGroups.push('Direktur');
+          else if (u.jabatan === 'SM' || u.jabatan === 'Senior Manager') { userGroups.push('Semua SM', 'Semua Senior Manager'); }
+          else if (u.jabatan === 'Staff') userGroups.push('Semua Staff');
+
+          const hasAccess = userGroups.some(g => recipientsArray.includes(g));
+          // Don't send push to the sender themselves
+          if (hasAccess && u.id !== req.user.id) {
+            targetUserIds.push(u.id);
+          }
+        }
+
+        if (targetUserIds.length > 0) {
+          // 2. Fetch push subscriptions
+          const subsRes = await db.query("SELECT * FROM push_subscriptions WHERE user_id = ANY($1)", [targetUserIds]);
+          
+          const payload = JSON.stringify({
+            title: 'Dokumen Baru Diterima',
+            body: `Dokumen ${newDoc.document_name} (${newDoc.document_type}) telah dibagikan ke divisi Anda oleh ${newDoc.sender_name}.`,
+            url: '/'
+          });
+
+          for (const sub of subsRes.rows) {
+            const pushSub = {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth }
+            };
+            webpush.sendNotification(pushSub, payload).catch(err => {
+              if (err.statusCode === 410 || err.statusCode === 404) {
+                // Subscription has expired or is no longer valid, delete it
+                db.query("DELETE FROM push_subscriptions WHERE endpoint = $1", [sub.endpoint]).catch(console.error);
+              } else {
+                console.error('Push notification error:', err);
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to send push notifications:', err);
+      }
+    })();
+
+    res.status(201).json({ message: 'Document uploaded successfully', document: newDoc });
+  } catch (err) {
+    console.error('Error submitting document:', err);
+    if (req.file && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) { }
+    }
     res.status(500).json({ error: 'Database error' });
   }
 });

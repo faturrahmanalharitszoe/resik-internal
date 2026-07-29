@@ -4757,7 +4757,7 @@ function sortAdminUsers(field) {
     adminSortField = field;
     adminSortDir = 'asc';
   }
-  
+
   // Update UI indicators
   document.querySelectorAll('#admin-panel-view th .sort-indicator').forEach(el => el.classList.remove('active'));
   const activeIndicator = document.getElementById('sort-ind-admin-' + field);
@@ -4765,7 +4765,7 @@ function sortAdminUsers(field) {
     activeIndicator.classList.add('active');
     activeIndicator.textContent = adminSortDir === 'asc' ? ' ▲' : ' ▼';
   }
-  
+
   filterAdminUsers();
 }
 window.sortAdminUsers = sortAdminUsers;
@@ -4774,7 +4774,7 @@ window.sortAdminUsers = sortAdminUsers;
 function filterAdminUsers() {
   const query = $('admin-user-search').value.toLowerCase().trim();
   let filtered = [...adminUsersList];
-  
+
   if (query) {
     filtered = filtered.filter(user => {
       return (user.display_name && user.display_name.toLowerCase().includes(query)) ||
@@ -4789,18 +4789,15 @@ function filterAdminUsers() {
   filtered.sort((a, b) => {
     let valA = (a[adminSortField] || '').toString().toLowerCase();
     let valB = (b[adminSortField] || '').toString().toLowerCase();
-    
+
     // Treat booleans correctly for 'is_admin'
     if (adminSortField === 'is_admin') {
       valA = a.is_admin ? 1 : 0;
       valB = b.is_admin ? 1 : 0;
     }
-    
     if (valA < valB) return adminSortDir === 'asc' ? -1 : 1;
     if (valA > valB) return adminSortDir === 'asc' ? 1 : -1;
     return 0;
-  });
-
   });
 
   renderAdminUsersTable(filtered);

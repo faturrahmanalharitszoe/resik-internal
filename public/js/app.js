@@ -4703,7 +4703,7 @@ async function loadAdminFormOptions() {
     const divSelect = $('admin-user-division');
     if (divSelect) {
       divSelect.innerHTML = '<option value="">Pilih Divisi</option>' + 
-        divisions.map(d => `<option value="${d.name.toLowerCase()}">${d.name}</option>`).join('');
+        divisions.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
     }
   }
   
@@ -4885,7 +4885,7 @@ async function openAdminEditUserModal(userId) {
   $('admin-user-password-container').style.display = 'none';
   
   // Set dropdowns if values exist, or empty
-  $('admin-user-division').value = user.division ? user.division.toLowerCase() : '';
+  $('admin-user-division').value = user.division ? user.division : '';
   $('admin-user-jabatan').value = user.jabatan || '';
   $('admin-user-role').value = user.role || 'staff';
   $('admin-user-is-admin').checked = user.is_admin || false;

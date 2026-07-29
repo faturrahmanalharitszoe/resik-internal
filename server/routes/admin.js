@@ -72,14 +72,7 @@ router.post('/users', async (req, res) => {
     }
 
     // Auto-join Division room
-    const divisionRoomMap = {
-      marketing: 'Marketing',
-      sdm: 'SDM',
-      keuangan: 'Keuangan',
-      operasional: 'Operasional',
-      it: 'IT'
-    };
-    const roomName = divisionRoomMap[division];
+    const roomName = division;
     if (roomName) {
       const divisionRoom = await db.query(
         "SELECT id FROM rooms WHERE name = $1 AND type = 'group' LIMIT 1",

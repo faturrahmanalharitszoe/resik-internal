@@ -36,7 +36,13 @@ async function migrate() {
       await db.query(`INSERT INTO positions (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`, [pos]);
     }
 
-    console.log('✅ Default data successfully inserted!');
+    console.log('Normalizing existing users division cases...');
+    const divisions = await db.query('SELECT name FROM divisions');
+    for (const row of divisions.rows) {
+      await db.query(`UPDATE users SET division = $1 WHERE LOWER(division) = LOWER($1)`, [row.name]);
+    }
+
+    console.log('✅ Default data successfully inserted and normalized!');
   } catch (err) {
     console.error('Migration failed:', err);
   } finally {

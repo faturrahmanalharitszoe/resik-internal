@@ -1045,67 +1045,82 @@
 
   <!-- MODAL: Admin Add/Edit User -->
   <div id="modal-admin-user-overlay" class="modal-overlay hidden">
-    <div class="modal">
+    <div class="modal modal-doc" style="width: 540px;">
       <div class="modal-header">
         <h3 id="admin-user-modal-title">Tambah User Baru</h3>
-        <button class="icon-btn"
+        <button class="icon-btn" type="button"
           onclick="document.getElementById('modal-admin-user-overlay').classList.add('hidden')">✕</button>
       </div>
-      <form id="admin-user-form" class="auth-form" onsubmit="handleAdminUserSubmit(event)">
+      <form id="admin-user-form" class="auth-form" onsubmit="handleAdminUserSubmit(event)" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
         <input type="hidden" id="admin-user-id" />
-        <div class="field">
-          <label>Nama Lengkap</label>
-          <input type="text" id="admin-user-display-name" required />
+        <div class="modal-doc-body">
+          <div class="field" style="margin-bottom: 16px;">
+            <label>Nama Lengkap</label>
+            <input type="text" id="admin-user-display-name" required />
+          </div>
+          
+          <div class="doc-row-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div class="field" style="margin-bottom: 0;">
+              <label>Username</label>
+              <input type="text" id="admin-user-username" required />
+            </div>
+            <div class="field" style="margin-bottom: 0;">
+              <label>Email</label>
+              <input type="email" id="admin-user-email" required />
+            </div>
+          </div>
+
+          <div class="field" id="admin-user-password-container" style="margin-bottom: 16px;">
+            <label>Password</label>
+            <input type="password" id="admin-user-password" />
+          </div>
+
+          <div class="doc-row-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div class="field" style="margin-bottom: 0;">
+              <label>Divisi</label>
+              <select id="admin-user-division">
+                <option value="marketing">Marketing</option>
+                <option value="sdm">SDM</option>
+                <option value="keuangan">Keuangan</option>
+                <option value="operasional">Operasional</option>
+                <option value="it">IT</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom: 0;">
+              <label>Jabatan</label>
+              <select id="admin-user-jabatan" required>
+                <option value="">Pilih Jabatan</option>
+                <option value="Staff">Staff</option>
+                <option value="Asisten Manager">Asisten Manager</option>
+                <option value="Manager">Manager</option>
+                <option value="Senior Manager">Senior Manager</option>
+                <option value="Direktur Umum">Direktur Umum</option>
+                <option value="Wakil Direktur Utama">Wakil Direktur Utama</option>
+                <option value="Direktur">Direktur</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="doc-row-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: center;">
+            <div class="field" style="margin-bottom: 0;">
+              <label>Role Sistem</label>
+              <select id="admin-user-role" required>
+                <option value="staff">Staff</option>
+                <option value="management">Management</option>
+                <option value="top management">Top Management</option>
+              </select>
+            </div>
+            <div class="field-checkbox" style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="admin-user-is-admin" style="width: 16px; height: 16px; margin-top: 2px;" />
+              <label for="admin-user-is-admin" style="font-size: 13px; margin-bottom: 0; font-weight: 500; cursor: pointer;">Jadikan Admin?</label>
+            </div>
+          </div>
+
+          <div id="admin-user-error" class="error-msg"></div>
         </div>
-        <div class="field">
-          <label>Username</label>
-          <input type="text" id="admin-user-username" required />
+        <div class="modal-doc-footer">
+          <button type="submit" class="btn-primary-sm">Simpan Pengguna</button>
         </div>
-        <div class="field">
-          <label>Email</label>
-          <input type="email" id="admin-user-email" required />
-        </div>
-        <div class="field" id="admin-user-password-container">
-          <label>Password</label>
-          <input type="password" id="admin-user-password" />
-        </div>
-        <div class="field">
-          <label>Divisi</label>
-          <select id="admin-user-division">
-            <option value="marketing">Marketing</option>
-            <option value="sdm">SDM</option>
-            <option value="keuangan">Keuangan</option>
-            <option value="operasional">Operasional</option>
-            <option value="it">IT</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Jabatan</label>
-          <select id="admin-user-jabatan" required>
-            <option value="">Pilih Jabatan</option>
-            <option value="Staff">Staff</option>
-            <option value="Asisten Manager">Asisten Manager</option>
-            <option value="Manager">Manager</option>
-            <option value="Senior Manager">Senior Manager</option>
-            <option value="Direktur Umum">Direktur Umum</option>
-            <option value="Wakil Direktur Utama">Wakil Direktur Utama</option>
-            <option value="Direktur">Direktur</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Role Sistem</label>
-          <select id="admin-user-role" required>
-            <option value="staff">Staff</option>
-            <option value="management">Management</option>
-            <option value="top management">Top Management</option>
-          </select>
-        </div>
-        <div class="field-checkbox" style="display: flex; align-items: center; gap: 8px; margin: 12px 0;">
-          <input type="checkbox" id="admin-user-is-admin" style="width: 16px; height: 16px;" />
-          <label for="admin-user-is-admin" style="font-size: 13px;">Admin?</label>
-        </div>
-        <div id="admin-user-error" class="error-msg"></div>
-        <button type="submit" class="btn-primary">Simpan</button>
       </form>
     </div>
   </div>

@@ -4293,12 +4293,28 @@ function openNotionPeek(rowId) {
 
   // Populate Assignee Options
   const assigneeSelect = $('notion-peek-assignee');
-  if (assigneeSelect && typeof systemUsers !== 'undefined' && systemUsers.length > 0) {
+  if (assigneeSelect) {
     let opts = '<option value="">— Unassigned</option>';
-    systemUsers.forEach(u => {
-      opts += `<option value="${u.display_name}">${u.display_name}</option>`;
+    let allUsersMap = new Map();
+    // Combine all possible user sources to guarantee the list is not empty
+    if (typeof systemUsers !== 'undefined') systemUsers.forEach(u => allUsersMap.set(u.id || u.username, u));
+    if (typeof adminUsersList !== 'undefined') adminUsersList.forEach(u => allUsersMap.set(u.id || u.username, u));
+    if (typeof recipientsList !== 'undefined') recipientsList.forEach(u => allUsersMap.set(u.id || u.username, u));
+    
+    Array.from(allUsersMap.values()).forEach(u => {
+      if (u.display_name) {
+        opts += `<option value="${u.display_name}">${u.display_name}</option>`;
+      }
     });
     assigneeSelect.innerHTML = opts;
+
+    if (typeof jQuery !== 'undefined') {
+      jQuery(assigneeSelect).select2({
+        dropdownParent: jQuery('#notion-peek-panel'),
+        width: '100%',
+        placeholder: '— Unassigned'
+      });
+    }
   }
 
   setVal('notion-peek-icon', dataRow.icon || '📄');
@@ -4306,6 +4322,11 @@ function openNotionPeek(rowId) {
   setVal('notion-peek-status', props.status || 'To Do');
   setVal('notion-peek-priority', props.priority || 'Low');
   setVal('notion-peek-assignee', props.assignee || '');
+  
+  if (typeof jQuery !== 'undefined') {
+    jQuery('#notion-peek-assignee').trigger('change');
+  }
+
   setVal('notion-peek-duedate', props.deadline || props.due_date || '');
   setVal('notion-peek-tags', (props.tags || []).join(', '));
   setVal('notion-peek-description', dataRow.content || '');
@@ -4322,9 +4343,9 @@ window.openNotionPeek = openNotionPeek;
 function updatePeekStatusStyle(sel) {
   if (!sel) return;
   const colors = {
-    'To Do':       { bg: 'rgba(99,102,241,0.1)',  border: '#6366f1', color: '#6366f1' },
+    'To Do': { bg: 'rgba(99,102,241,0.1)', border: '#6366f1', color: '#6366f1' },
     'In Progress': { bg: 'rgba(245,158,11,0.1)', border: '#f59e0b', color: '#d97706' },
-    'Done':        { bg: 'rgba(16,185,129,0.1)',  border: '#10b981', color: '#059669' },
+    'Done': { bg: 'rgba(16,185,129,0.1)', border: '#10b981', color: '#059669' },
   };
   const c = colors[sel.value] || {};
   sel.style.background = c.bg || '';
@@ -4337,9 +4358,9 @@ window.updatePeekStatusStyle = updatePeekStatusStyle;
 function updatePeekPriorityStyle(sel) {
   if (!sel) return;
   const colors = {
-    'Low':    { bg: 'rgba(16,185,129,0.1)',  border: '#10b981', color: '#059669' },
+    'Low': { bg: 'rgba(16,185,129,0.1)', border: '#10b981', color: '#059669' },
     'Medium': { bg: 'rgba(245,158,11,0.1)', border: '#f59e0b', color: '#d97706' },
-    'High':   { bg: 'rgba(239,68,68,0.1)',   border: '#ef4444', color: '#dc2626' },
+    'High': { bg: 'rgba(239,68,68,0.1)', border: '#ef4444', color: '#dc2626' },
   };
   const c = colors[sel.value] || {};
   sel.style.background = c.bg || '';
@@ -4741,21 +4762,21 @@ window.switchAdminSubView = switchAdminSubView;
 async function loadAdminFormOptions() {
   const divisions = await apiFetch('/api/admin/divisions');
   const positions = await apiFetch('/api/admin/positions');
-  
+
   if (divisions && Array.isArray(divisions)) {
     adminDivisionsList = divisions;
     const divSelect = $('admin-user-division');
     if (divSelect) {
-      divSelect.innerHTML = '<option value="">Pilih Divisi</option>' + 
+      divSelect.innerHTML = '<option value="">Pilih Divisi</option>' +
         divisions.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
     }
   }
-  
+
   if (positions && Array.isArray(positions)) {
     adminPositionsList = positions;
     const posSelect = $('admin-user-jabatan');
     if (posSelect) {
-      posSelect.innerHTML = '<option value="">Pilih Jabatan</option>' + 
+      posSelect.innerHTML = '<option value="">Pilih Jabatan</option>' +
         positions.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
     }
   }
@@ -4891,7 +4912,7 @@ window.filterAdminUsers = filterAdminUsers;
 // Open Add User Modal
 async function openAdminAddUserModal() {
   await loadAdminFormOptions();
-  
+
   $('admin-user-modal-title').textContent = 'Tambah Pengguna Baru';
   $('admin-user-id').value = '';
   $('admin-user-display-name').value = '';
@@ -4927,7 +4948,7 @@ async function openAdminEditUserModal(userId) {
   $('admin-user-password').value = '';
   $('admin-user-password').required = false;
   $('admin-user-password-container').style.display = 'none';
-  
+
   // Set dropdowns if values exist, or empty
   $('admin-user-division').value = user.division ? user.division : '';
   $('admin-user-jabatan').value = user.jabatan || '';
@@ -5077,7 +5098,7 @@ async function addAdminDivision() {
     method: 'POST',
     body: { name: name.trim() }
   });
-  
+
   if (res && res.error) {
     Swal.fire('Gagal!', res.error, 'error');
     return;
@@ -5103,7 +5124,7 @@ async function deleteAdminDivision(id, name) {
   });
 
   if (!confirmResult.isConfirmed) return;
-  
+
   const res = await apiFetch(`/api/admin/divisions/${id}`, { method: 'DELETE' });
   if (res && res.error) {
     Swal.fire('Gagal!', res.error, 'error');
@@ -5172,7 +5193,7 @@ async function addAdminPosition() {
     method: 'POST',
     body: { name: name.trim() }
   });
-  
+
   if (res && res.error) {
     Swal.fire('Gagal!', res.error, 'error');
     return;
@@ -5198,7 +5219,7 @@ async function deleteAdminPosition(id, name) {
   });
 
   if (!confirmResult.isConfirmed) return;
-  
+
   const res = await apiFetch(`/api/admin/positions/${id}`, { method: 'DELETE' });
   if (res && res.error) {
     Swal.fire('Gagal!', res.error, 'error');

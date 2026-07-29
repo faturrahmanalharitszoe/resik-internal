@@ -4291,6 +4291,16 @@ function openNotionPeek(rowId) {
 
   const props = typeof dataRow.properties === 'string' ? JSON.parse(dataRow.properties) : (dataRow.properties || {});
 
+  // Populate Assignee Options
+  const assigneeSelect = $('notion-peek-assignee');
+  if (assigneeSelect && window.systemUsers) {
+    let opts = '<option value="">— Unassigned</option>';
+    window.systemUsers.forEach(u => {
+      opts += `<option value="${u.display_name}">${u.display_name}</option>`;
+    });
+    assigneeSelect.innerHTML = opts;
+  }
+
   setVal('notion-peek-icon', dataRow.icon || '📄');
   setVal('notion-peek-title', dataRow.title || '');
   setVal('notion-peek-status', props.status || 'To Do');

@@ -4806,3 +4806,8 @@ html[data-theme="dark"] .doc-preview-content .docx-container {
   background: rgba(59, 130, 246, 0.1);
   border-color: #3b82f6;
 }
+/* Summernote Fixes */
+.note-editable ul { list-style: disc !important; padding-left: 20px !important; }
+.note-editable ol { list-style: decimal !important; padding-left: 20px !important; }
+.note-modal-backdrop { z-index: 99999 !important; }
+.note-modal { z-index: 100000 !important; }

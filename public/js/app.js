@@ -3112,6 +3112,7 @@ async function toggleNotionEditMode() {
     if (!summernoteInitialized) {
       jQuery('#notion-summernote').summernote({
         height: 400,
+        dialogsInBody: true,
         toolbar: [
           ['style', ['style']],
           ['font', ['bold', 'underline', 'clear']],
@@ -4351,6 +4352,7 @@ function openNotionPeek(rowId) {
     if (!window.peekSummernoteInitialized) {
       jQuery('#notion-peek-summernote').summernote({
         height: 400,
+        dialogsInBody: true,
         toolbar: [
           ['style', ['style']],
           ['font', ['bold', 'underline', 'clear']],

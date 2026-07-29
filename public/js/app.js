@@ -5017,7 +5017,7 @@ async function addAdminDivision() {
 
   const res = await apiFetch('/api/admin/divisions', {
     method: 'POST',
-    body: JSON.stringify({ name: name.trim() })
+    body: { name: name.trim() }
   });
   if (res && res.error) {
     alert(res.error);
@@ -5084,7 +5084,7 @@ async function addAdminPosition() {
 
   const res = await apiFetch('/api/admin/positions', {
     method: 'POST',
-    body: JSON.stringify({ name: name.trim() })
+    body: { name: name.trim() }
   });
   if (res && res.error) {
     alert(res.error);

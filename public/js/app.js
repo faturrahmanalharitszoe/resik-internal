@@ -3699,6 +3699,19 @@ async function deleteDbRow(rowId) {
 }
 window.deleteDbRow = deleteDbRow;
 
+function formatNotionDateTime(val) {
+  if (!val) return '';
+  const parts = val.split('T');
+  const dParts = parts[0].split('-');
+  if (dParts.length !== 3) return val;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+  let res = `${dParts[2]} ${monthNames[parseInt(dParts[1], 10) - 1]} ${dParts[0]}`;
+  if (parts.length > 1) {
+    res += ` ${parts[1]}`;
+  }
+  return res;
+}
+
 function renderBoard(rows) {
   const container = $('notion-db-content');
   if (!container) return;
@@ -3775,7 +3788,7 @@ function renderBoard(rows) {
           ${props.assignee ? `<span class="tag-pill tag-gray">${esc(props.assignee.toUpperCase())}</span>` : ''}
         </div>
         <div class="notion-board-card-footer">
-          ${deadline ? `<span>📅 ${deadline}</span>` : '<span></span>'}
+          ${deadline ? `<span>📅 ${formatNotionDateTime(deadline)}</span>` : '<span></span>'}
           ${progress > 0 ? `<span>${progress}% selesai</span>` : ''}
         </div>
       `;
@@ -4532,7 +4545,7 @@ function renderNotionCalendar() {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const dateTasks = allTasks.filter(task => {
       const props = typeof task.properties === 'string' ? JSON.parse(task.properties) : (task.properties || {});
-      return props.deadline === dateStr;
+      return (props.deadline || '').startsWith(dateStr);
     });
 
     dateTasks.forEach(task => {

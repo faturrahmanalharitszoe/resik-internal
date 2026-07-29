@@ -1129,6 +1129,18 @@
           </div>
         </div>
 
+        <!-- Start Date -->
+        <div style="display: grid; grid-template-columns: 130px 1fr; align-items: center; padding: 6px 0;">
+          <span style="display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); font-weight: 500;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Start Date
+          </span>
+          <div>
+            <input type="datetime-local" id="notion-peek-startdate"
+              style="border: 1.5px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 13px; background: var(--bg); color: var(--text-primary); font-family: var(--font); outline: none; width: 100%; cursor: pointer;" />
+          </div>
+        </div>
+
         <!-- Due Date -->
         <div style="display: grid; grid-template-columns: 130px 1fr; align-items: center; padding: 6px 0;">
           <span style="display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); font-weight: 500;">
@@ -1136,7 +1148,7 @@
             Due Date
           </span>
           <div>
-            <input type="date" id="notion-peek-duedate"
+            <input type="datetime-local" id="notion-peek-duedate"
               style="border: 1.5px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 13px; background: var(--bg); color: var(--text-primary); font-family: var(--font); outline: none; width: 100%; cursor: pointer;" />
           </div>
         </div>

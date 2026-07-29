@@ -3625,10 +3625,10 @@ function renderTable(rows) {
           </select>
         </td>
         <td>
-          <input type="date" value="${startDate}" onchange="updateRowPropertyDirect('${row.id}', 'start_date', this.value)" class="notion-table-date-input" />
+          <input type="datetime-local" value="${startDate}" onchange="updateRowPropertyDirect('${row.id}', 'start_date', this.value)" class="notion-table-date-input" />
         </td>
         <td>
-          <input type="date" value="${deadline}" onchange="updateRowPropertyDirect('${row.id}', 'deadline', this.value)" class="notion-table-date-input" />
+          <input type="datetime-local" value="${deadline}" onchange="updateRowPropertyDirect('${row.id}', 'deadline', this.value)" class="notion-table-date-input" />
         </td>
         <td>
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -4327,6 +4327,7 @@ function openNotionPeek(rowId) {
     jQuery('#notion-peek-assignee').trigger('change');
   }
 
+  setVal('notion-peek-startdate', props.start_date || '');
   setVal('notion-peek-duedate', props.deadline || props.due_date || '');
   setVal('notion-peek-tags', (props.tags || []).join(', '));
   setVal('notion-peek-description', dataRow.content || '');
@@ -4387,11 +4388,12 @@ async function saveNotionPeek() {
   const status = getVal('notion-peek-status', 'To Do');
   const priority = getVal('notion-peek-priority', 'Low');
   const assignee = getVal('notion-peek-assignee', '');
+  const start_date = getVal('notion-peek-startdate', '');
   const deadline = getVal('notion-peek-duedate', '');
   const tags = getVal('notion-peek-tags', '').split(',').map(t => t.trim()).filter(Boolean);
   const content = getVal('notion-peek-description', '');
 
-  const updatedProps = { status, priority, assignee, deadline, tags };
+  const updatedProps = { status, priority, assignee, start_date, deadline, tags };
 
   if (status === 'Done') {
     updatedProps.progress = 100;

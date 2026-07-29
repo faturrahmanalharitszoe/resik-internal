@@ -2848,6 +2848,9 @@ async function openNotionPage(pageId) {
     $('notion-page-content-area').classList.add('hidden');
     $('notion-database-content-area').classList.remove('hidden');
 
+    const editBtn = $('btn-notion-edit');
+    if (editBtn) editBtn.classList.add('hidden');
+
     activeDbView = currentNotionPage.database_view || 'table';
     document.querySelectorAll('.notion-db-tab').forEach(btn => {
       btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === activeDbView.toLowerCase());

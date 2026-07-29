@@ -4293,9 +4293,9 @@ function openNotionPeek(rowId) {
 
   // Populate Assignee Options
   const assigneeSelect = $('notion-peek-assignee');
-  if (assigneeSelect && window.systemUsers) {
+  if (assigneeSelect && typeof systemUsers !== 'undefined' && systemUsers.length > 0) {
     let opts = '<option value="">— Unassigned</option>';
-    window.systemUsers.forEach(u => {
+    systemUsers.forEach(u => {
       opts += `<option value="${u.display_name}">${u.display_name}</option>`;
     });
     assigneeSelect.innerHTML = opts;

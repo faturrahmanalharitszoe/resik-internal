@@ -4746,6 +4746,30 @@ function renderAdminUsersTable(users) {
   });
 }
 
+// Admin Users Sorting State
+let adminSortField = 'display_name';
+let adminSortDir = 'asc';
+
+function sortAdminUsers(field) {
+  if (adminSortField === field) {
+    adminSortDir = adminSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    adminSortField = field;
+    adminSortDir = 'asc';
+  }
+  
+  // Update UI indicators
+  document.querySelectorAll('#admin-panel-view th .sort-indicator').forEach(el => el.classList.remove('active'));
+  const activeIndicator = document.getElementById('sort-ind-admin-' + field);
+  if (activeIndicator) {
+    activeIndicator.classList.add('active');
+    activeIndicator.textContent = adminSortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+  
+  filterAdminUsers();
+}
+window.sortAdminUsers = sortAdminUsers;
+
 // Client-side search filter
 function filterAdminUsers() {
   const query = $('admin-user-search').value.toLowerCase().trim();
@@ -4761,6 +4785,21 @@ function filterAdminUsers() {
       (user.jabatan && user.jabatan.toLowerCase().includes(query)) ||
       (user.role && user.role.toLowerCase().includes(query)) ||
       (user.division && user.division.toLowerCase().includes(query));
+  });
+
+  filtered.sort((a, b) => {
+    let valA = (a[adminSortField] || '').toString().toLowerCase();
+    let valB = (b[adminSortField] || '').toString().toLowerCase();
+    
+    // Treat booleans correctly for 'is_admin'
+    if (adminSortField === 'is_admin') {
+      valA = a.is_admin ? 1 : 0;
+      valB = b.is_admin ? 1 : 0;
+    }
+    
+    if (valA < valB) return adminSortDir === 'asc' ? -1 : 1;
+    if (valA > valB) return adminSortDir === 'asc' ? 1 : -1;
+    return 0;
   });
 
   renderAdminUsersTable(filtered);

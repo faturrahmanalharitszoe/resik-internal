@@ -4811,3 +4811,9 @@ html[data-theme="dark"] .doc-preview-content .docx-container {
 .note-editable ol { list-style: decimal !important; padding-left: 20px !important; }
 .note-modal-backdrop { z-index: 99999 !important; }
 .note-modal { z-index: 100000 !important; }
+
+/* Fix Summernote Fullscreen in Modal */
+.note-editor.note-frame.fullscreen { z-index: 10500 !important; background: var(--bg-surface) !important; }
+.note-editor.note-frame.fullscreen .note-editable { background: var(--bg-surface) !important; }
+.side-peek-panel { transform: none !important; transition: right 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important; right: -850px; }
+.side-peek-panel.open { right: 0 !important; }

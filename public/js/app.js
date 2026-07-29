@@ -4668,15 +4668,55 @@ async function addMemberToRoom(userId) {
 window.addMemberToRoom = addMemberToRoom;
 
 /* ─── ADMIN PANEL CONTROLLERS ─── */
+// State Variables for Admin
 let adminUsersList = [];
-
-// Switch subview (currently only users)
+let adminDivisionsList = [];
+let adminPositionsList = [];
+// Switch subview
 function switchAdminSubView(subView) {
   document.querySelectorAll('.admin-section .room-item').forEach(el => {
     el.classList.toggle('active', el.id === `btn-admin-${subView}`);
   });
+
+  const containers = ['users', 'divisions', 'positions'];
+  containers.forEach(c => {
+    const el = $(`admin-${c}-container`);
+    if (el) el.classList.add('hidden');
+  });
+
+  const target = $(`admin-${subView}-container`);
+  if (target) target.classList.remove('hidden');
+
+  if (subView === 'users') loadAdminUsers();
+  if (subView === 'divisions') loadAdminDivisions();
+  if (subView === 'positions') loadAdminPositions();
 }
 window.switchAdminSubView = switchAdminSubView;
+
+// Load Form Options (for the Add/Edit User Modal)
+async function loadAdminFormOptions() {
+  const divisions = await apiFetch('/api/admin/divisions');
+  const positions = await apiFetch('/api/admin/positions');
+  
+  if (divisions) {
+    adminDivisionsList = divisions;
+    const divSelect = $('admin-user-division');
+    if (divSelect) {
+      divSelect.innerHTML = '<option value="">Pilih Divisi</option>' + 
+        divisions.map(d => `<option value="${d.name.toLowerCase()}">${d.name}</option>`).join('');
+    }
+  }
+  
+  if (positions) {
+    adminPositionsList = positions;
+    const posSelect = $('admin-user-jabatan');
+    if (posSelect) {
+      posSelect.innerHTML = '<option value="">Pilih Jabatan</option>' + 
+        positions.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+    }
+  }
+}
+window.loadAdminFormOptions = loadAdminFormOptions;
 
 // Load all users
 async function loadAdminUsers() {
@@ -4805,7 +4845,9 @@ function filterAdminUsers() {
 window.filterAdminUsers = filterAdminUsers;
 
 // Open Add User Modal
-function openAdminAddUserModal() {
+async function openAdminAddUserModal() {
+  await loadAdminFormOptions();
+  
   $('admin-user-modal-title').textContent = 'Tambah Pengguna Baru';
   $('admin-user-id').value = '';
   $('admin-user-display-name').value = '';
@@ -4826,9 +4868,11 @@ function openAdminAddUserModal() {
 window.openAdminAddUserModal = openAdminAddUserModal;
 
 // Open Edit User Modal
-function openAdminEditUserModal(userId) {
+async function openAdminEditUserModal(userId) {
   const user = adminUsersList.find(u => u.id === userId);
   if (!user) return;
+
+  await loadAdminFormOptions();
 
   $('admin-user-modal-title').textContent = 'Edit Pengguna';
   $('admin-user-id').value = user.id;
@@ -4839,10 +4883,12 @@ function openAdminEditUserModal(userId) {
   $('admin-user-password').value = '';
   $('admin-user-password').required = false;
   $('admin-user-password-container').style.display = 'none';
-  $('admin-user-division').value = user.division || '';
-  $('admin-user-role').value = user.role || 'staff';
+  
+  // Set dropdowns if values exist, or empty
+  $('admin-user-division').value = user.division ? user.division.toLowerCase() : '';
   $('admin-user-jabatan').value = user.jabatan || '';
-  $('admin-user-is-admin').checked = !!user.is_admin;
+  $('admin-user-role').value = user.role || 'staff';
+  $('admin-user-is-admin').checked = user.is_admin || false;
   $('admin-user-error').textContent = '';
 
   $('modal-admin-user-overlay').classList.remove('hidden');
@@ -4932,7 +4978,141 @@ async function handleAdminUserSubmit(e) {
 }
 window.handleAdminUserSubmit = handleAdminUserSubmit;
 
-// Open Reset Password Modal
+// --- DIVISIONS MANAGEMENT ---
+async function loadAdminDivisions() {
+  const divisions = await apiFetch('/api/admin/divisions');
+  if (divisions) {
+    adminDivisionsList = divisions;
+    renderAdminDivisionsTable(divisions);
+  }
+}
+window.loadAdminDivisions = loadAdminDivisions;
+
+function renderAdminDivisionsTable(divisions) {
+  const tbody = $('admin-divisions-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (divisions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px; color:var(--text-muted);">Tidak ada data divisi.</td></tr>';
+    return;
+  }
+
+  divisions.forEach(div => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+    tr.innerHTML = `
+      <td style="padding: 12px 16px; font-weight: 500; color: var(--text-primary);">${esc(div.name)}</td>
+      <td style="padding: 12px 16px; text-align: center;">
+        <button class="btn-secondary-sm" style="padding: 4px 8px; font-size: 11px; color: var(--error);" onclick="deleteAdminDivision('${div.id}', '${esc(div.name)}')">Hapus</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function addAdminDivision() {
+  const name = prompt('Masukkan nama divisi baru:');
+  if (!name || !name.trim()) return;
+
+  const res = await apiFetch('/api/admin/divisions', {
+    method: 'POST',
+    body: JSON.stringify({ name: name.trim() })
+  });
+  if (res && res.error) {
+    alert(res.error);
+    return;
+  }
+  if (res) {
+    loadAdminDivisions();
+    loadAdminFormOptions(); // Refresh dropdowns
+  }
+}
+window.addAdminDivision = addAdminDivision;
+
+async function deleteAdminDivision(id, name) {
+  if (!confirm(`Apakah Anda yakin ingin menghapus divisi "${name}"?`)) return;
+  
+  const res = await apiFetch(`/api/admin/divisions/${id}`, { method: 'DELETE' });
+  if (res && res.error) {
+    alert(res.error);
+    return;
+  }
+  if (res) {
+    loadAdminDivisions();
+    loadAdminFormOptions(); // Refresh dropdowns
+  }
+}
+window.deleteAdminDivision = deleteAdminDivision;
+
+// --- POSITIONS MANAGEMENT ---
+async function loadAdminPositions() {
+  const positions = await apiFetch('/api/admin/positions');
+  if (positions) {
+    adminPositionsList = positions;
+    renderAdminPositionsTable(positions);
+  }
+}
+window.loadAdminPositions = loadAdminPositions;
+
+function renderAdminPositionsTable(positions) {
+  const tbody = $('admin-positions-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (positions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px; color:var(--text-muted);">Tidak ada data jabatan.</td></tr>';
+    return;
+  }
+
+  positions.forEach(pos => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--border)';
+    tr.innerHTML = `
+      <td style="padding: 12px 16px; font-weight: 500; color: var(--text-primary);">${esc(pos.name)}</td>
+      <td style="padding: 12px 16px; text-align: center;">
+        <button class="btn-secondary-sm" style="padding: 4px 8px; font-size: 11px; color: var(--error);" onclick="deleteAdminPosition('${pos.id}', '${esc(pos.name)}')">Hapus</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function addAdminPosition() {
+  const name = prompt('Masukkan nama jabatan baru:');
+  if (!name || !name.trim()) return;
+
+  const res = await apiFetch('/api/admin/positions', {
+    method: 'POST',
+    body: JSON.stringify({ name: name.trim() })
+  });
+  if (res && res.error) {
+    alert(res.error);
+    return;
+  }
+  if (res) {
+    loadAdminPositions();
+    loadAdminFormOptions(); // Refresh dropdowns
+  }
+}
+window.addAdminPosition = addAdminPosition;
+
+async function deleteAdminPosition(id, name) {
+  if (!confirm(`Apakah Anda yakin ingin menghapus jabatan "${name}"?`)) return;
+  
+  const res = await apiFetch(`/api/admin/positions/${id}`, { method: 'DELETE' });
+  if (res && res.error) {
+    alert(res.error);
+    return;
+  }
+  if (res) {
+    loadAdminPositions();
+    loadAdminFormOptions(); // Refresh dropdowns
+  }
+}
+window.deleteAdminPosition = deleteAdminPosition;
+
+// Reset Password
 function openAdminResetPwdModal(userId) {
   $('admin-reset-pwd-user-id').value = userId;
   $('admin-reset-pwd-password').value = '';

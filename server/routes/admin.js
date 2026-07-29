@@ -200,4 +200,84 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+// --- DIVISIONS MANAGEMENT ---
+
+router.get('/divisions', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM divisions ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin get divisions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/divisions', async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Nama divisi wajib diisi' });
+  try {
+    const result = await db.query(
+      'INSERT INTO divisions (name) VALUES ($1) RETURNING *',
+      [name]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin add division error:', err);
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Divisi sudah ada' });
+    }
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/divisions/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM divisions WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Admin delete division error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- POSITIONS MANAGEMENT ---
+
+router.get('/positions', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM positions ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Admin get positions error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/positions', async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Nama jabatan wajib diisi' });
+  try {
+    const result = await db.query(
+      'INSERT INTO positions (name) VALUES ($1) RETURNING *',
+      [name]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin add position error:', err);
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Jabatan sudah ada' });
+    }
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/positions/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM positions WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Admin delete position error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

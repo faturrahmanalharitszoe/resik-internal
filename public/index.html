@@ -205,6 +205,22 @@
             </svg>
             <span>Manajemen User</span>
           </li>
+          <li id="btn-admin-divisions" class="room-item" onclick="switchAdminSubView('divisions')"
+            title="Manajemen Divisi">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="9" y1="21" x2="9" y2="9" />
+            </svg>
+            <span>Manajemen Divisi</span>
+          </li>
+          <li id="btn-admin-positions" class="room-item" onclick="switchAdminSubView('positions')"
+            title="Manajemen Jabatan">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <span>Manajemen Jabatan</span>
+          </li>
         </ul>
       </div>
 
@@ -616,51 +632,100 @@
           </div>
         </div>
         <div class="admin-content" style="padding: 24px 24px 60px; flex: 1; overflow-y: auto;">
-          <div class="admin-controls"
-            style="display: flex; gap: 16px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
-            <div class="search-box" style="flex: 1; min-width: 250px; position: relative;">
-              <input type="text" id="admin-user-search" placeholder="Cari user..." oninput="filterAdminUsers()"
-                style="width: 100%; padding: 10px 36px 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-primary); font-family: var(--font); outline: none;" />
+          
+          <!-- Users Container -->
+          <div id="admin-users-container">
+            <div class="admin-controls"
+              style="display: flex; gap: 16px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+              <div class="search-box" style="flex: 1; min-width: 250px; position: relative;">
+                <input type="text" id="admin-user-search" placeholder="Cari user..." oninput="filterAdminUsers()"
+                  style="width: 100%; padding: 10px 36px 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text-primary); font-family: var(--font); outline: none;" />
+              </div>
+              <button class="btn-primary-sm" onclick="openAdminAddUserModal()">+ Tambah User</button>
             </div>
-            <button class="btn-primary-sm" onclick="openAdminAddUserModal()">+ Tambah User</button>
+            <div class="table-wrapper"
+              style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;">
+              <table class="sharing-table"
+                style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.02);">
+                    <th class="sortable" onclick="sortAdminUsers('display_name')"
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Nama
+                      Lengkap <span class="sort-indicator" id="sort-ind-admin-display_name"></span></th>
+                    <th class="sortable" onclick="sortAdminUsers('username')"
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">
+                      Username <span class="sort-indicator" id="sort-ind-admin-username"></span></th>
+                    <th class="sortable" onclick="sortAdminUsers('email')"
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Email
+                      <span class="sort-indicator" id="sort-ind-admin-email"></span></th>
+                    <th class="sortable" onclick="sortAdminUsers('division')"
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Divisi
+                      <span class="sort-indicator" id="sort-ind-admin-division"></span></th>
+                    <th class="sortable" onclick="sortAdminUsers('jabatan')"
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Jabatan
+                      <span class="sort-indicator" id="sort-ind-admin-jabatan"></span></th>
+                    <th class="sortable" onclick="sortAdminUsers('role')"
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Role
+                      <span class="sort-indicator" id="sort-ind-admin-role"></span></th>
+                    <th class="sortable" onclick="sortAdminUsers('is_admin')"
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Admin?
+                      <span class="sort-indicator" id="sort-ind-admin-is_admin"></span></th>
+                    <th
+                      style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); text-align: center; width: 220px;">
+                      Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-table-body">
+                  <!-- Dynamically populated rows -->
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div class="table-wrapper"
-            style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;">
-            <table class="sharing-table"
-              style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
-              <thead>
-                <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.02);">
-                  <th class="sortable" onclick="sortAdminUsers('display_name')"
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Nama
-                    Lengkap <span class="sort-indicator" id="sort-ind-admin-display_name"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('username')"
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">
-                    Username <span class="sort-indicator" id="sort-ind-admin-username"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('email')"
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Email
-                    <span class="sort-indicator" id="sort-ind-admin-email"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('division')"
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Divisi
-                    <span class="sort-indicator" id="sort-ind-admin-division"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('jabatan')"
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Jabatan
-                    <span class="sort-indicator" id="sort-ind-admin-jabatan"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('role')"
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Role
-                    <span class="sort-indicator" id="sort-ind-admin-role"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('is_admin')"
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Admin?
-                    <span class="sort-indicator" id="sort-ind-admin-is_admin"></span></th>
-                  <th
-                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); text-align: center; width: 220px;">
-                    Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="admin-users-table-body">
-                <!-- Dynamically populated rows -->
-              </tbody>
-            </table>
+
+          <!-- Divisions Container -->
+          <div id="admin-divisions-container" class="hidden">
+            <div class="admin-controls"
+              style="display: flex; gap: 16px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+              <h2 style="margin:0; font-size: 18px; font-weight: 600; flex: 1;">Daftar Divisi</h2>
+              <button class="btn-primary-sm" onclick="addAdminDivision()">+ Tambah Divisi</button>
+            </div>
+            <div class="table-wrapper"
+              style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;">
+              <table class="sharing-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.02);">
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);">Nama Divisi</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); width: 120px; text-align: center;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-divisions-table-body">
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          <!-- Positions Container -->
+          <div id="admin-positions-container" class="hidden">
+            <div class="admin-controls"
+              style="display: flex; gap: 16px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+              <h2 style="margin:0; font-size: 18px; font-weight: 600; flex: 1;">Daftar Jabatan</h2>
+              <button class="btn-primary-sm" onclick="addAdminPosition()">+ Tambah Jabatan</button>
+            </div>
+            <div class="table-wrapper"
+              style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;">
+              <table class="sharing-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.02);">
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary);">Nama Jabatan</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); width: 120px; text-align: center;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-positions-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
     </main>
@@ -1079,24 +1144,13 @@
             <div class="field" style="margin-bottom: 0;">
               <label>Divisi</label>
               <select id="admin-user-division">
-                <option value="marketing">Marketing</option>
-                <option value="sdm">SDM</option>
-                <option value="keuangan">Keuangan</option>
-                <option value="operasional">Operasional</option>
-                <option value="it">IT</option>
+                <option value="">Memuat Divisi...</option>
               </select>
             </div>
             <div class="field" style="margin-bottom: 0;">
               <label>Jabatan</label>
               <select id="admin-user-jabatan" required>
-                <option value="">Pilih Jabatan</option>
-                <option value="Staff">Staff</option>
-                <option value="Asisten Manager">Asisten Manager</option>
-                <option value="Manager">Manager</option>
-                <option value="Senior Manager">Senior Manager</option>
-                <option value="Direktur Umum">Direktur Umum</option>
-                <option value="Wakil Direktur Utama">Wakil Direktur Utama</option>
-                <option value="Direktur">Direktur</option>
+                <option value="">Memuat Jabatan...</option>
               </select>
             </div>
           </div>

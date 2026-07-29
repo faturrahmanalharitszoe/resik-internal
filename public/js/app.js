@@ -3898,7 +3898,7 @@ function renderCalendar(rows) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const dateTasks = rows.filter(r => {
       const props = typeof r.properties === 'string' ? JSON.parse(r.properties) : (r.properties || {});
-      return props.deadline === dateStr;
+      return (props.deadline || '').startsWith(dateStr);
     });
 
     dateTasks.forEach(task => {

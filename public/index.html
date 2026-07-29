@@ -630,13 +630,27 @@
               style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
               <thead>
                 <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.02);">
-                  <th class="sortable" onclick="sortAdminUsers('display_name')" style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Nama Lengkap <span class="sort-indicator" id="sort-ind-admin-display_name"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('username')" style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Username <span class="sort-indicator" id="sort-ind-admin-username"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('email')" style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Email <span class="sort-indicator" id="sort-ind-admin-email"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('division')" style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Divisi <span class="sort-indicator" id="sort-ind-admin-division"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('jabatan')" style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Jabatan <span class="sort-indicator" id="sort-ind-admin-jabatan"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('role')" style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Role <span class="sort-indicator" id="sort-ind-admin-role"></span></th>
-                  <th class="sortable" onclick="sortAdminUsers('is_admin')" style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Admin? <span class="sort-indicator" id="sort-ind-admin-is_admin"></span></th>
+                  <th class="sortable" onclick="sortAdminUsers('display_name')"
+                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Nama
+                    Lengkap <span class="sort-indicator" id="sort-ind-admin-display_name"></span></th>
+                  <th class="sortable" onclick="sortAdminUsers('username')"
+                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">
+                    Username <span class="sort-indicator" id="sort-ind-admin-username"></span></th>
+                  <th class="sortable" onclick="sortAdminUsers('email')"
+                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Email
+                    <span class="sort-indicator" id="sort-ind-admin-email"></span></th>
+                  <th class="sortable" onclick="sortAdminUsers('division')"
+                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Divisi
+                    <span class="sort-indicator" id="sort-ind-admin-division"></span></th>
+                  <th class="sortable" onclick="sortAdminUsers('jabatan')"
+                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Jabatan
+                    <span class="sort-indicator" id="sort-ind-admin-jabatan"></span></th>
+                  <th class="sortable" onclick="sortAdminUsers('role')"
+                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Role
+                    <span class="sort-indicator" id="sort-ind-admin-role"></span></th>
+                  <th class="sortable" onclick="sortAdminUsers('is_admin')"
+                    style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Admin?
+                    <span class="sort-indicator" id="sort-ind-admin-is_admin"></span></th>
                   <th
                     style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); text-align: center; width: 220px;">
                     Aksi</th>
@@ -1123,10 +1137,13 @@
       <div style="font-size: 48px; margin-bottom: 16px;">🔔</div>
       <h3 style="margin-bottom: 12px;">Aktifkan Notifikasi</h3>
       <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 24px; line-height: 1.5;">
-        Aplikasi mewajibkan fitur Web Push Notifications agar Anda tidak ketinggalan dokumen dan informasi penting dari divisi Anda.
+        Aplikasi mewajibkan fitur Web Push Notifications agar Anda tidak ketinggalan dokumen dan informasi penting dari
+        divisi Anda.
       </p>
-      <button id="btn-allow-push" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;">Izinkan Notifikasi Sekarang</button>
-      <div id="push-error-msg" class="error-msg hidden" style="margin-top: 16px; font-size: 13px;">Izin diblokir oleh browser. Klik ikon gembok 🔒 di URL (kiri atas), ubah Notifications ke Allow, lalu Refresh halaman ini.</div>
+      <button id="btn-allow-push" class="btn-primary"
+        style="width: 100%; justify-content: center; padding: 12px;">Izinkan Notifikasi Sekarang</button>
+      <div id="push-error-msg" class="error-msg hidden" style="margin-top: 16px; font-size: 13px;">Izin diblokir oleh
+        browser. Klik ikon gembok 🔒 di URL (kiri atas), ubah Notifications ke Allow, lalu Refresh halaman ini.</div>
     </div>
   </div>
 

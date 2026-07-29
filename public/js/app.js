@@ -4773,19 +4773,18 @@ window.sortAdminUsers = sortAdminUsers;
 // Client-side search filter
 function filterAdminUsers() {
   const query = $('admin-user-search').value.toLowerCase().trim();
-  if (!query) {
-    renderAdminUsersTable(adminUsersList);
-    return;
+  let filtered = [...adminUsersList];
+  
+  if (query) {
+    filtered = filtered.filter(user => {
+      return (user.display_name && user.display_name.toLowerCase().includes(query)) ||
+        (user.username && user.username.toLowerCase().includes(query)) ||
+        (user.email && user.email.toLowerCase().includes(query)) ||
+        (user.jabatan && user.jabatan.toLowerCase().includes(query)) ||
+        (user.role && user.role.toLowerCase().includes(query)) ||
+        (user.division && user.division.toLowerCase().includes(query));
+    });
   }
-
-  const filtered = adminUsersList.filter(user => {
-    return (user.display_name && user.display_name.toLowerCase().includes(query)) ||
-      (user.username && user.username.toLowerCase().includes(query)) ||
-      (user.email && user.email.toLowerCase().includes(query)) ||
-      (user.jabatan && user.jabatan.toLowerCase().includes(query)) ||
-      (user.role && user.role.toLowerCase().includes(query)) ||
-      (user.division && user.division.toLowerCase().includes(query));
-  });
 
   filtered.sort((a, b) => {
     let valA = (a[adminSortField] || '').toString().toLowerCase();
@@ -4800,6 +4799,8 @@ function filterAdminUsers() {
     if (valA < valB) return adminSortDir === 'asc' ? -1 : 1;
     if (valA > valB) return adminSortDir === 'asc' ? 1 : -1;
     return 0;
+  });
+
   });
 
   renderAdminUsersTable(filtered);

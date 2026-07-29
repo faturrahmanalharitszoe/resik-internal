@@ -29,11 +29,6 @@ router.post('/users', async (req, res) => {
     return res.status(400).json({ error: 'Semua field wajib diisi' });
   }
 
-  const validDivisions = ['marketing', 'sdm', 'keuangan', 'operasional', 'it'];
-  if (division && !validDivisions.includes(division)) {
-    return res.status(400).json({ error: 'Divisi tidak valid' });
-  }
-
   const validRoles = ['staff', 'management', 'top management', 'admin'];
   if (!validRoles.includes(role)) {
     return res.status(400).json({ error: 'Role tidak valid' });
@@ -112,11 +107,6 @@ router.put('/users/:id', async (req, res) => {
 
   if (!display_name || !email || !role || !jabatan) {
     return res.status(400).json({ error: 'Semua field wajib diisi' });
-  }
-
-  const validDivisions = ['marketing', 'sdm', 'keuangan', 'operasional', 'it'];
-  if (division && !validDivisions.includes(division)) {
-    return res.status(400).json({ error: 'Divisi tidak valid' });
   }
 
   const validRoles = ['staff', 'management', 'top management', 'admin'];

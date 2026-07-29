@@ -4698,7 +4698,7 @@ async function loadAdminFormOptions() {
   const divisions = await apiFetch('/api/admin/divisions');
   const positions = await apiFetch('/api/admin/positions');
   
-  if (divisions) {
+  if (divisions && Array.isArray(divisions)) {
     adminDivisionsList = divisions;
     const divSelect = $('admin-user-division');
     if (divSelect) {
@@ -4707,7 +4707,7 @@ async function loadAdminFormOptions() {
     }
   }
   
-  if (positions) {
+  if (positions && Array.isArray(positions)) {
     adminPositionsList = positions;
     const posSelect = $('admin-user-jabatan');
     if (posSelect) {
@@ -4981,7 +4981,7 @@ window.handleAdminUserSubmit = handleAdminUserSubmit;
 // --- DIVISIONS MANAGEMENT ---
 async function loadAdminDivisions() {
   const divisions = await apiFetch('/api/admin/divisions');
-  if (divisions) {
+  if (divisions && Array.isArray(divisions)) {
     adminDivisionsList = divisions;
     renderAdminDivisionsTable(divisions);
   }
@@ -5048,7 +5048,7 @@ window.deleteAdminDivision = deleteAdminDivision;
 // --- POSITIONS MANAGEMENT ---
 async function loadAdminPositions() {
   const positions = await apiFetch('/api/admin/positions');
-  if (positions) {
+  if (positions && Array.isArray(positions)) {
     adminPositionsList = positions;
     renderAdminPositionsTable(positions);
   }

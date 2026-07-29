@@ -4302,8 +4302,42 @@ function openNotionPeek(rowId) {
 
   $('notion-peek-backdrop').classList.remove('hidden');
   $('notion-peek-panel').classList.add('open');
+
+  // Apply color styles to selects
+  updatePeekStatusStyle($('notion-peek-status'));
+  updatePeekPriorityStyle($('notion-peek-priority'));
 }
 window.openNotionPeek = openNotionPeek;
+
+function updatePeekStatusStyle(sel) {
+  if (!sel) return;
+  const colors = {
+    'To Do':       { bg: 'rgba(99,102,241,0.1)',  border: '#6366f1', color: '#6366f1' },
+    'In Progress': { bg: 'rgba(245,158,11,0.1)', border: '#f59e0b', color: '#d97706' },
+    'Done':        { bg: 'rgba(16,185,129,0.1)',  border: '#10b981', color: '#059669' },
+  };
+  const c = colors[sel.value] || {};
+  sel.style.background = c.bg || '';
+  sel.style.borderColor = c.border || 'var(--border)';
+  sel.style.color = c.color || 'var(--text-primary)';
+  sel.style.fontWeight = '600';
+}
+window.updatePeekStatusStyle = updatePeekStatusStyle;
+
+function updatePeekPriorityStyle(sel) {
+  if (!sel) return;
+  const colors = {
+    'Low':    { bg: 'rgba(16,185,129,0.1)',  border: '#10b981', color: '#059669' },
+    'Medium': { bg: 'rgba(245,158,11,0.1)', border: '#f59e0b', color: '#d97706' },
+    'High':   { bg: 'rgba(239,68,68,0.1)',   border: '#ef4444', color: '#dc2626' },
+  };
+  const c = colors[sel.value] || {};
+  sel.style.background = c.bg || '';
+  sel.style.borderColor = c.border || 'var(--border)';
+  sel.style.color = c.color || 'var(--text-primary)';
+  sel.style.fontWeight = '600';
+}
+window.updatePeekPriorityStyle = updatePeekPriorityStyle;
 
 function closeNotionPeek() {
   $('notion-peek-backdrop').classList.add('hidden');

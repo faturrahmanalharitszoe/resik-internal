@@ -4346,7 +4346,23 @@ function openNotionPeek(rowId) {
   setVal('notion-peek-startdate', props.start_date || '');
   setVal('notion-peek-duedate', props.deadline || props.due_date || '');
   setVal('notion-peek-tags', (props.tags || []).join(', '));
-  setVal('notion-peek-description', dataRow.content || '');
+
+  if (typeof jQuery !== 'undefined') {
+    if (!window.peekSummernoteInitialized) {
+      jQuery('#notion-peek-summernote').summernote({
+        height: 250,
+        toolbar: [
+          ['style', ['style']],
+          ['font', ['bold', 'underline', 'clear']],
+          ['para', ['ul', 'ol', 'paragraph']],
+          ['insert', ['link', 'picture']],
+          ['view', ['fullscreen', 'codeview']]
+        ]
+      });
+      window.peekSummernoteInitialized = true;
+    }
+    jQuery('#notion-peek-summernote').summernote('code', ensureHtml(dataRow.content || ''));
+  }
 
   $('notion-peek-backdrop').classList.remove('hidden');
   $('notion-peek-panel').classList.add('open');
@@ -4407,7 +4423,11 @@ async function saveNotionPeek() {
   const start_date = getVal('notion-peek-startdate', '');
   const deadline = getVal('notion-peek-duedate', '');
   const tags = getVal('notion-peek-tags', '').split(',').map(t => t.trim()).filter(Boolean);
-  const content = getVal('notion-peek-description', '');
+  
+  let content = '';
+  if (typeof jQuery !== 'undefined' && window.peekSummernoteInitialized) {
+    content = jQuery('#notion-peek-summernote').summernote('code');
+  }
 
   const updatedProps = { status, priority, assignee, start_date, deadline, tags };
 

@@ -4350,7 +4350,7 @@ function openNotionPeek(rowId) {
   if (typeof jQuery !== 'undefined') {
     if (!window.peekSummernoteInitialized) {
       jQuery('#notion-peek-summernote').summernote({
-        height: 250,
+        height: 400,
         toolbar: [
           ['style', ['style']],
           ['font', ['bold', 'underline', 'clear']],

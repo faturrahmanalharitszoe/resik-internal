@@ -3951,7 +3951,7 @@ function renderGallery(rows) {
   }
 
   const galleryEl = document.createElement('div');
-  galleryEl.className = 'notion-gallery-view';
+  galleryEl.className = 'notion-gallery';
 
   rows.forEach(row => {
     const props = typeof row.properties === 'string' ? JSON.parse(row.properties) : (row.properties || {});
@@ -3960,20 +3960,20 @@ function renderGallery(rows) {
     const cover = row.cover_image || 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)';
 
     const card = document.createElement('div');
-    card.className = 'gallery-card';
+    card.className = 'notion-gallery-card';
     card.style.position = 'relative';
 
     const coverStyle = cover.startsWith('linear-gradient') ? `background: ${cover};` : `background-image: url(${cover}); background-size: cover; background-position: center;`;
 
     card.innerHTML = `
-       <div class="gallery-card-cover" style="${coverStyle}"></div>
+       <div class="notion-gallery-card-cover" style="${coverStyle}"></div>
        <button onclick="event.stopPropagation(); deleteDbRow('${row.id}')" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); border: none; color: white; cursor: pointer; font-size: 16px; padding: 6px 8px; border-radius: 4px; display: none;" class="gallery-delete-btn" title="Hapus">🗑️</button>
-       <div class="gallery-card-info" onclick="openNotionPeek('${row.id}')">
-         <div style="display:flex; align-items:center; gap: 6px; margin-bottom: 4px;">
+       <div class="notion-gallery-card-content" onclick="openNotionPeek('${row.id}')">
+         <div class="notion-gallery-card-title">
            <span style="font-size: 16px;">${icon}</span>
-           <span class="gallery-card-title">${esc(row.title)}</span>
+           <span>${esc(row.title)}</span>
          </div>
-         <div style="display:flex; gap: 4px; align-items:center;">
+         <div class="notion-gallery-card-props">
            <span class="tag-pill tag-${status === 'Done' ? 'green' : status === 'In Progress' ? 'yellow' : 'gray'}">${status}</span>
            ${props.assignee ? `<span class="tag-pill tag-blue">${esc(props.assignee.toUpperCase())}</span>` : ''}
          </div>
@@ -4004,7 +4004,7 @@ function renderList(rows) {
   }
 
   const listEl = document.createElement('div');
-  listEl.className = 'notion-list-view';
+  listEl.className = 'notion-list';
 
   rows.forEach(row => {
     const props = typeof row.properties === 'string' ? JSON.parse(row.properties) : (row.properties || {});
@@ -4015,18 +4015,18 @@ function renderList(rows) {
     const isDone = status === 'Done';
 
     const item = document.createElement('div');
-    item.className = 'list-item';
+    item.className = 'notion-list-item';
     item.style.position = 'relative';
 
     const titleStrikethrough = isDone ? ' style="text-decoration: line-through; color: var(--text-muted);"' : '';
 
     item.innerHTML = `
-       <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+       <div class="notion-list-item-left">
          <input type="checkbox" ${isDone ? 'checked' : ''} onclick="event.stopPropagation(); toggleListTaskStatus('${row.id}', '${status}')" style="cursor: pointer; width: 15px; height: 15px;" />
          <span style="font-size: 16px;">${icon}</span>
          <span class="list-item-title"${titleStrikethrough}>${esc(row.title)}</span>
        </div>
-       <div style="display: flex; gap: 6px; align-items: center;">
+       <div class="notion-list-item-right">
          <span class="tag-pill tag-${priority === 'High' ? 'red' : priority === 'Medium' ? 'yellow' : 'gray'}">${priority}</span>
          ${assignee ? `<span class="tag-pill tag-blue">${esc(assignee.toUpperCase())}</span>` : ''}
          <button onclick="event.stopPropagation(); deleteDbRow('${row.id}')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; padding: 4px 8px; margin-left: 8px;" title="Hapus">🗑️</button>
@@ -4313,7 +4313,7 @@ function openNotionPeek(rowId) {
     if (typeof systemUsers !== 'undefined') systemUsers.forEach(u => allUsersMap.set(u.id || u.username, u));
     if (typeof adminUsersList !== 'undefined') adminUsersList.forEach(u => allUsersMap.set(u.id || u.username, u));
     if (typeof recipientsList !== 'undefined') recipientsList.forEach(u => allUsersMap.set(u.id || u.username, u));
-    
+
     Array.from(allUsersMap.values()).forEach(u => {
       if (u.display_name) {
         opts += `<option value="${u.display_name}">${u.display_name}</option>`;
@@ -4335,7 +4335,7 @@ function openNotionPeek(rowId) {
   setVal('notion-peek-status', props.status || 'To Do');
   setVal('notion-peek-priority', props.priority || 'Low');
   setVal('notion-peek-assignee', props.assignee || '');
-  
+
   if (typeof jQuery !== 'undefined') {
     jQuery('#notion-peek-assignee').trigger('change');
   }

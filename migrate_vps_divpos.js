@@ -21,7 +21,10 @@ async function migrate() {
       )
     `);
     
-    console.log('Tables created. Inserting default data...');
+    // Drop old hardcoded division constraint from users table
+    await db.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_division_check`);
+
+    console.log('Tables created and constraints updated. Inserting default data...');
 
     const defaultDivisions = ['Marketing', 'SDM', 'Keuangan', 'Operasional', 'IT'];
     for (const div of defaultDivisions) {

@@ -5012,18 +5012,34 @@ function renderAdminDivisionsTable(divisions) {
 }
 
 async function addAdminDivision() {
-  const name = prompt('Masukkan nama divisi baru:');
+  const { value: name } = await Swal.fire({
+    title: 'Tambah Divisi',
+    input: 'text',
+    inputLabel: 'Nama Divisi Baru',
+    inputPlaceholder: 'Masukkan nama divisi...',
+    showCancelButton: true,
+    confirmButtonText: 'Simpan',
+    cancelButtonText: 'Batal',
+    inputValidator: (value) => {
+      if (!value || !value.trim()) {
+        return 'Nama divisi tidak boleh kosong!'
+      }
+    }
+  });
+
   if (!name || !name.trim()) return;
 
   const res = await apiFetch('/api/admin/divisions', {
     method: 'POST',
     body: { name: name.trim() }
   });
+  
   if (res && res.error) {
-    alert(res.error);
+    Swal.fire('Gagal!', res.error, 'error');
     return;
   }
   if (res) {
+    Swal.fire('Berhasil!', 'Divisi berhasil ditambahkan.', 'success');
     loadAdminDivisions();
     loadAdminFormOptions(); // Refresh dropdowns
   }
@@ -5031,14 +5047,26 @@ async function addAdminDivision() {
 window.addAdminDivision = addAdminDivision;
 
 async function deleteAdminDivision(id, name) {
-  if (!confirm(`Apakah Anda yakin ingin menghapus divisi "${name}"?`)) return;
+  const confirmResult = await Swal.fire({
+    title: 'Apakah Anda yakin?',
+    text: `Anda akan menghapus divisi "${name}". Tindakan ini tidak dapat dibatalkan!`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Ya, hapus!',
+    cancelButtonText: 'Batal'
+  });
+
+  if (!confirmResult.isConfirmed) return;
   
   const res = await apiFetch(`/api/admin/divisions/${id}`, { method: 'DELETE' });
   if (res && res.error) {
-    alert(res.error);
+    Swal.fire('Gagal!', res.error, 'error');
     return;
   }
   if (res) {
+    Swal.fire('Dihapus!', `Divisi "${name}" telah dihapus.`, 'success');
     loadAdminDivisions();
     loadAdminFormOptions(); // Refresh dropdowns
   }
@@ -5079,18 +5107,34 @@ function renderAdminPositionsTable(positions) {
 }
 
 async function addAdminPosition() {
-  const name = prompt('Masukkan nama jabatan baru:');
+  const { value: name } = await Swal.fire({
+    title: 'Tambah Jabatan',
+    input: 'text',
+    inputLabel: 'Nama Jabatan Baru',
+    inputPlaceholder: 'Masukkan nama jabatan...',
+    showCancelButton: true,
+    confirmButtonText: 'Simpan',
+    cancelButtonText: 'Batal',
+    inputValidator: (value) => {
+      if (!value || !value.trim()) {
+        return 'Nama jabatan tidak boleh kosong!'
+      }
+    }
+  });
+
   if (!name || !name.trim()) return;
 
   const res = await apiFetch('/api/admin/positions', {
     method: 'POST',
     body: { name: name.trim() }
   });
+  
   if (res && res.error) {
-    alert(res.error);
+    Swal.fire('Gagal!', res.error, 'error');
     return;
   }
   if (res) {
+    Swal.fire('Berhasil!', 'Jabatan berhasil ditambahkan.', 'success');
     loadAdminPositions();
     loadAdminFormOptions(); // Refresh dropdowns
   }
@@ -5098,14 +5142,26 @@ async function addAdminPosition() {
 window.addAdminPosition = addAdminPosition;
 
 async function deleteAdminPosition(id, name) {
-  if (!confirm(`Apakah Anda yakin ingin menghapus jabatan "${name}"?`)) return;
+  const confirmResult = await Swal.fire({
+    title: 'Apakah Anda yakin?',
+    text: `Anda akan menghapus jabatan "${name}". Tindakan ini tidak dapat dibatalkan!`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Ya, hapus!',
+    cancelButtonText: 'Batal'
+  });
+
+  if (!confirmResult.isConfirmed) return;
   
   const res = await apiFetch(`/api/admin/positions/${id}`, { method: 'DELETE' });
   if (res && res.error) {
-    alert(res.error);
+    Swal.fire('Gagal!', res.error, 'error');
     return;
   }
   if (res) {
+    Swal.fire('Dihapus!', `Jabatan "${name}" telah dihapus.`, 'success');
     loadAdminPositions();
     loadAdminFormOptions(); // Refresh dropdowns
   }

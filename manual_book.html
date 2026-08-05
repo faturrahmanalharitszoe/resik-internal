@@ -589,7 +589,7 @@
                     </li>
                     <li>
                         <span class="toc-num">3.4</span>
-                        <span class="toc-text"><a href="#notion-wiki">Mode Halaman Wiki / Catatan</a></span>
+                        <span class="toc-text"><a href="#notion-wiki">Mode Halaman Wiki / Catatan & Pengeditan</a></span>
                         <span class="toc-page">14</span>
                     </li>
                     <li>
@@ -889,7 +889,7 @@
         </div>
 
         <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Membuat Halaman Baru</h4>
-        <ol class="step-list">
+        <ul>
             <li>Klik tombol <strong>+ Halaman Baru</strong> di pojok kanan atas sidebar Workspace.</li>
             <li>Masukkan judul halaman, lalu pilih tipe halaman:
                 <ul>
@@ -900,26 +900,7 @@
                 </ul>
             </li>
             <li>Halaman baru akan langsung dibuka dan siap digunakan.</li>
-        </ol>
-
-        <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Mengedit Konten Halaman Wiki /
-            Catatan</h4>
-        <ol class="step-list">
-            <li>Buka halaman wiki/catatan yang ingin diedit dari sidebar.</li>
-            <li>Klik tombol <strong>Edit</strong> di pojok kanan atas area konten.</li>
-            <li>Saat mode edit aktif, gunakan toolbar untuk memformat teks:
-                <ul>
-                    <li><strong>H</strong> — Heading (Judul)</li>
-                    <li><strong>B</strong> — Bold (Tebal)</li>
-                    <li><strong>I</strong> — Italic (Miring)</li>
-                    <li><strong>•</strong> — Bullet List (Daftar Tak Bernomor)</li>
-                    <li><strong>1.</strong> — Numbered List (Daftar Bernomor)</li>
-                    <li><strong>🔗</strong> — Sisipkan Tautan (Link)</li>
-                    <li><strong>🖼️</strong> — Sisipkan Gambar</li>
-                </ul>
-            </li>
-            <li>Klik <strong>Simpan</strong> setelah selesai, atau <strong>Batal</strong> untuk membatalkan perubahan.</li>
-        </ol>
+        </ul>
         <div class="image-placeholder">Gambar: Mode edit halaman dengan toolbar pemformatan teks</div>
         <div class="page-num-footer">11</div>
     </div>
@@ -943,21 +924,35 @@
         <h3 class="subsection-title" id="notion-wiki"><span
                 style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">3.4</span>Mode
             Halaman Wiki / Catatan</h3>
-        <p>Workspace memiliki dua jenis halaman utama: <strong>Halaman Catatan (Wiki)</strong> dan <strong>Halaman
-                Database</strong>. Halaman Catatan digunakan untuk menulis dokumentasi, notulen rapat, catatan proyek, atau
-            materi kolaborasi bebas dalam format teks kaya (rich text).</p>
+        <p>Halaman Catatan digunakan untuk menulis dokumentasi, notulen rapat, catatan proyek, atau materi kolaborasi
+            bebas dalam format teks kaya (rich text).</p>
         <ul>
             <li>Setiap halaman baru yang dibuat secara default bertipe <strong>Catatan (Wiki)</strong>.</li>
-            <li>Klik tombol <strong>Edit</strong> untuk membuka editor Summernote. Anda bisa memformat teks dengan heading,
-                bold, italic, daftar bernomor/bullet, menyisipkan gambar, tautan, dan tabel.</li>
-            <li>Gunakan tombol <strong>Simpan</strong> untuk menyimpan perubahan konten, atau <strong>Batal</strong> untuk
-                membatalkan.</li>
             <li>Setiap halaman bisa memiliki <strong>Sub-halaman</strong> (anak halaman) untuk membuat struktur
                 dokumentasi hierarkis.</li>
             <li>Klik tombol <strong>+ Halaman Baru</strong> untuk membuat sub-halaman di bawah halaman yang sedang aktif.
             </li>
         </ul>
-        <div class="image-placeholder">Gambar: Tampilan halaman catatan (Wiki) dengan editor Summernote</div>
+
+        <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Mengedit Konten Halaman Wiki /
+            Catatan</h4>
+        <ul>
+            <li>Buka halaman wiki/catatan yang ingin diedit dari sidebar.</li>
+            <li>Klik tombol <strong>Edit</strong> di pojok kanan atas area konten.</li>
+            <li>Saat mode edit aktif, gunakan toolbar untuk memformat teks:
+                <ul>
+                    <li><strong>H</strong> — Heading (Judul)</li>
+                    <li><strong>B</strong> — Bold (Tebal)</li>
+                    <li><strong>I</strong> — Italic (Miring)</li>
+                    <li><strong>•</strong> — Bullet List (Daftar Tak Bernomor)</li>
+                    <li><strong>1.</strong> — Numbered List (Daftar Bernomor)</li>
+                    <li><strong>🔗</strong> — Sisipkan Tautan (Link)</li>
+                    <li><strong>🖼️</strong> — Sisipkan Gambar</li>
+                </ul>
+            </li>
+            <li>Klik <strong>Simpan</strong> setelah selesai, atau <strong>Batal</strong> untuk membatalkan perubahan.</li>
+        </ul>
+        <div class="image-placeholder">Gambar: Mode edit halaman dengan toolbar pemformatan teks</div>
 
         <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Pengaturan Akses Halaman</h4>
         <p>Setiap halaman memiliki pengaturan akses untuk mengontrol siapa yang bisa melihatnya:</p>
@@ -974,15 +969,43 @@
         <h3 class="subsection-title" id="notion-database"><span
                 style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">3.5</span>Menggunakan
             Mode Database</h3>
-        <p>Workspace mendukung manajemen tugas/data yang terstruktur jika Anda menggunakan halaman bertipe
-            Database.</p>
+        <p>Halaman Database digunakan untuk melacak tugas dan proyek dengan data terstruktur. Database mendukung
+            berbagai tampilan visual yang bisa ditukar sesuai kebutuhan.</p>
+
+        <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Menambah Baris Data</h4>
         <ul>
-            <li>Ubah tampilan data menggunakan tab: <strong>Table, Board, Calendar, Gallery, List,</strong> atau
-                <strong>Timeline</strong>.
+            <li>Klik tombol <strong>+ Baris Baru</strong> di pojok kanan atas area database.</li>
+            <li>Masukkan judul baris, lalu isi properti seperti Status, Priority, Assignee, Start Date, dan Deadline.
             </li>
-            <li>Gunakan menu <strong>Filter</strong> (Status, Priority, Assignee) untuk menyaring data yang ditampilkan.
-            </li>
-            <li>Klik <strong>+ Baris Baru</strong> untuk menambahkan item tugas/data baru ke dalam database.</li>
+        </ul>
+
+        <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Mengedit Data via Peek Panel</h4>
+        <ul>
+            <li>Klik pada judul baris (atau klik di mana saja pada baris) untuk membuka panel edit (peek panel).</li>
+            <li>Di dalam peek panel, Anda bisa mengubah: Judul, Ikon, Status, Priority, Assignee, Start Date, Due
+                Date, Tags, dan <strong>Deskripsi/Notulen</strong> (bagian teks kaya di bagian bawah panel).</li>
+            <li>Klik <strong>Simpan</strong> untuk menyimpan perubahan, atau tutup panel untuk membatalkan.</li>
+        </ul>
+
+        <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Mengubah Tampilan (View)</h4>
+        <p>Gunakan tab di bagian atas database untuk beralih antar tampilan:</p>
+        <ul>
+            <li><strong>Table</strong> — Tampilan tabel spreadsheet dengan kolom Status, Prioritas, Divisi, Tanggal, dan
+                Kemajuan.</li>
+            <li><strong>Board</strong> — Tampilan Kanban dengan 3 kolom: To Do, In Progress, Done. Data bisa
+                di-*drag-and-drop* antar kolom.</li>
+            <li><strong>Calendar</strong> — Tampilan kalender bulanan. Baris yang memiliki Deadline akan muncul pada
+                tanggal yang sesuai.</li>
+            <li><strong>Gallery</strong> — Tampilan kartu (card) dengan cover gambar, status, dan assignee.</li>
+            <li><strong>List</strong> — Tampilan daftar checklist. Centang checkbox untuk menandai tugas selesai.</li>
+            <li><strong>Timeline</strong> — Tampilan Gantt chart horizontal berdasarkan Start Date dan Deadline.</li>
+        </ul>
+
+        <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Menyaring Data (Filter)</h4>
+        <ul>
+            <li>Gunakan dropdown filter di bagian atas untuk menyaring berdasarkan <strong>Status</strong>,
+                <strong>Priority</strong>, atau <strong>Assignee</strong>.</li>
+            <li>Gunakan <strong>kotak pencarian</strong> untuk mencari baris berdasarkan judul atau deskripsi.</li>
         </ul>
         <div class="image-placeholder">Gambar: Tampilan Database dengan berbagai mode tampilan</div>
 

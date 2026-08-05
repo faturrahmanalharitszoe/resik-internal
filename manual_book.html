@@ -1,159 +1,1021 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
+
 <head>
-<meta charset="utf-8">
-<title>Manual Book - Resik Internal</title>
-<style>
-  body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-  h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-  h2 { color: #34495e; margin-top: 30px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-  h3 { color: #2980b9; margin-top: 20px; }
-  .note { background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0; font-size: 0.9em; }
-  .screenshot { background-color: #f1f2f6; border: 1px dashed #a4b0be; padding: 40px 20px; text-align: center; color: #747d8c; margin: 20px 0; font-style: italic; }
-  ul { padding-left: 20px; }
-  li { margin-bottom: 5px; }
-  hr { border: 0; height: 1px; background: #ddd; margin: 30px 0; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buku Panduan Pengguna - Resik Internal</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --primary: #5A32FA;
+            --primary-light: #7c5cfb;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --bg-body: #e5e7eb;
+            --bg-card: #ffffff;
+            --accent: #f5a623;
+            --border: #eaedf2;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 900px;
+            background: var(--bg-card);
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Cover Page Styles */
+        .cover-page {
+            background: linear-gradient(135deg, #321682, #5a32fa);
+            color: white;
+            min-height: 1000px;
+            /* simulating a4 height roughly */
+            padding: 80px 60px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cover-circles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .circle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .circle-1 {
+            width: 600px;
+            height: 600px;
+            top: -200px;
+            right: -200px;
+        }
+
+        .circle-2 {
+            width: 300px;
+            height: 300px;
+            bottom: 200px;
+            right: 100px;
+        }
+
+        .circle-3 {
+            width: 400px;
+            height: 400px;
+            bottom: -100px;
+            left: -100px;
+        }
+
+        .cover-content {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .cover-subtitle {
+            display: inline-block;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 20px;
+            padding: 8px 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.85em;
+            margin-bottom: 30px;
+        }
+
+        .cover-title {
+            font-size: 4.5em;
+            font-weight: 700;
+            margin: 0 0 15px 0;
+            line-height: 1.1;
+        }
+
+        .cover-desc {
+            font-size: 1.3em;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 60px;
+        }
+
+        .cover-brand {
+            font-size: 1.8em;
+            font-weight: 600;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+        }
+
+        .cover-brand::before {
+            content: '✦';
+            margin-right: 10px;
+            color: #dcd0ff;
+        }
+
+        .cover-features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: auto;
+        }
+
+        .cover-feature-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .cover-feature-num {
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+
+        .cover-feature-title {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .cover-footer {
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 20px;
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.7);
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Content Pages Styles */
+        .content-page {
+            padding: 60px 80px;
+            min-height: 1000px;
+        }
+
+        .page-header {
+            text-transform: uppercase;
+            font-size: 0.85em;
+            color: var(--primary);
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            color: #2a1668;
+            font-size: 2.5em;
+            font-weight: 700;
+            margin: 0 0 20px 0;
+        }
+
+        .divider {
+            width: 60px;
+            height: 4px;
+            background: var(--accent);
+            margin-bottom: 40px;
+        }
+
+        .toc-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .toc-list>li {
+            margin-bottom: 25px;
+        }
+
+        .toc-item-main {
+            display: flex;
+            font-weight: 700;
+            font-size: 1.2em;
+            color: #2a1668;
+            margin-bottom: 15px;
+        }
+
+        .toc-num {
+            color: var(--primary);
+            width: 40px;
+        }
+
+        .toc-text {
+            flex: 1;
+        }
+
+        .toc-page {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .toc-sublist {
+            list-style: none;
+            padding-left: 40px;
+        }
+
+        .toc-sublist li {
+            display: flex;
+            margin-bottom: 15px;
+            color: var(--text-main);
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 5px;
+        }
+
+        .toc-sublist .toc-num {
+            width: 40px;
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+
+        .toc-sublist .toc-text {
+            background: white;
+            padding-right: 10px;
+            margin-bottom: -6px;
+        }
+
+        .toc-sublist .toc-page {
+            background: white;
+            padding-left: 10px;
+            margin-bottom: -6px;
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+
+        .toc-list a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        h2.section-title {
+            color: var(--primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+            margin-top: 50px;
+            font-size: 1.8em;
+        }
+
+        h3.subsection-title {
+            color: var(--primary-light);
+            margin-top: 30px;
+            font-size: 1.3em;
+        }
+
+        p {
+            margin-bottom: 16px;
+        }
+
+        ul,
+        ol {
+            margin-bottom: 24px;
+            padding-left: 24px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .note {
+            background: #fff8e1;
+            border-left: 4px solid var(--accent);
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 1em;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: #f9faff;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #eef0f7;
+        }
+
+        .feature-card .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-light);
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: #2a1668;
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
+        }
+
+        .feature-card p {
+            margin: 0;
+            font-size: 0.95em;
+            color: var(--text-muted);
+        }
+
+        .step-list {
+            list-style: none;
+            padding: 0;
+            counter-reset: step-counter;
+        }
+
+        .step-list li {
+            position: relative;
+            padding-left: 40px;
+            margin-bottom: 16px;
+        }
+
+        .step-list li::before {
+            counter-increment: step-counter;
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 2px;
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .image-placeholder {
+            width: 100%;
+            height: 250px;
+            background: #eef0f7;
+            border: 2px dashed #d0d7e5;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8fa0c1;
+            margin: 25px 0;
+            font-style: italic;
+        }
+
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-size: 0.8em;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 40px;
+        }
+
+        .top-nav .nav-right {
+            color: var(--text-muted);
+            font-weight: normal;
+        }
+
+        .page-num-footer {
+            text-align: center;
+            color: var(--text-muted);
+            margin-top: 50px;
+        }
+
+        .closing-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-height: 800px;
+        }
+
+        .closing-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #321682, #5a32fa);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+        }
+
+        .closing-title {
+            color: #2a1668;
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .closing-badges {
+            display: flex;
+            gap: 15px;
+            margin-top: 40px;
+        }
+
+        .badge {
+            background: #f0eaff;
+            color: var(--primary);
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+    </style>
 </head>
+
 <body>
 
-<h1>Buku Panduan Pengguna (User Manual) - Resik Internal</h1>
+    <!-- Cover Page -->
+    <div class="page cover-page">
+        <div class="cover-circles">
+            <div class="circle circle-1"></div>
+            <div class="circle circle-2"></div>
+            <div class="circle circle-3"></div>
+        </div>
+        <div class="cover-content">
+            <div>
+                <div class="cover-subtitle">Buku Panduan Pengguna</div>
+                <h1 class="cover-title">User Manual</h1>
+                <p class="cover-desc">Panduan lengkap penggunaan aplikasi kolaborasi internal</p>
 
-<p>Selamat datang di aplikasi <strong>Resik Internal</strong>. Aplikasi ini dirancang untuk memudahkan kolaborasi dan komunikasi di dalam perusahaan melalui tiga fitur utama: <strong>Chat</strong>, <strong>Notion (Pusat Catatan & Kolaborasi)</strong>, dan <strong>Folder Bersama</strong>.</p>
+                <div class="cover-brand">Resik Internal</div>
 
-<div class="note">
-  <strong>Catatan:</strong> Panduan ini menggunakan blok penanda untuk tempat gambar (placeholder). Harap hapus kotak placeholder tersebut dan tambahkan gambar yang sesuai (Insert &gt; Pictures) saat mengedit di Microsoft Word.
-</div>
+                <div class="cover-features">
+                    <div class="cover-feature-card">
+                        <div class="cover-feature-num">01</div>
+                        <div class="cover-feature-title">Chat</div>
+                    </div>
+                    <div class="cover-feature-card">
+                        <div class="cover-feature-num">02</div>
+                        <div class="cover-feature-title">Folder Bersama</div>
+                    </div>
+                    <div class="cover-feature-card">
+                        <div class="cover-feature-num">03</div>
+                        <div class="cover-feature-title">Notion Workspace</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="cover-footer">
+            <div>Dokumen Internal — Rahasia Perusahaan</div>
+            <div>Edisi 2026</div>
+        </div>
+    </div>
 
-<hr>
+    <!-- Table of Contents Page -->
+    <div class="page content-page">
+        <div class="page-header">Isi Panduan</div>
+        <h1 class="page-title">Daftar Isi</h1>
+        <div class="divider"></div>
 
-<h2>1. Fitur Chat (Percakapan)</h2>
-<p>Fitur Chat memungkinkan Anda untuk berkomunikasi dengan rekan kerja secara <em>real-time</em>, baik melalui grup (ruangan) maupun pesan pribadi (Direct Message).</p>
+        <ul class="toc-list">
+            <li>
+                <div class="toc-item-main">
+                    <span class="toc-num">—</span>
+                    <span class="toc-text"><a href="#pendahuluan">Pendahuluan</a></span>
+                    <span class="toc-page">3</span>
+                </div>
+            </li>
+            <li>
+                <div class="toc-item-main">
+                    <span class="toc-num">01</span>
+                    <span class="toc-text"><a href="#modul-chat">Fitur Chat (Percakapan)</a></span>
+                    <span class="toc-page">4</span>
+                </div>
+                <ul class="toc-sublist">
+                    <li>
+                        <span class="toc-num">1.1</span>
+                        <span class="toc-text"><a href="#chat-mengakses">Mengakses Chat</a></span>
+                        <span class="toc-page">4</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">1.2</span>
+                        <span class="toc-text"><a href="#chat-membuat-ruangan">Membuat Ruangan Baru (Grup)</a></span>
+                        <span class="toc-page">4</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">1.3</span>
+                        <span class="toc-text"><a href="#chat-mengirim-pesan">Mengirim Pesan</a></span>
+                        <span class="toc-page">5</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">1.4</span>
+                        <span class="toc-text"><a href="#chat-manajemen-anggota">Manajemen Anggota Ruangan</a></span>
+                        <span class="toc-page">6</span>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <div class="toc-item-main">
+                    <span class="toc-num">02</span>
+                    <span class="toc-text"><a href="#modul-folder-bersama">Fitur Folder Bersama (Manajemen
+                            Dokumen)</a></span>
+                    <span class="toc-page">7</span>
+                </div>
+                <ul class="toc-sublist">
+                    <li>
+                        <span class="toc-num">2.1</span>
+                        <span class="toc-text"><a href="#folder-mengakses">Mengakses Folder Bersama</a></span>
+                        <span class="toc-page">7</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">2.2</span>
+                        <span class="toc-text"><a href="#folder-mengunggah">Mengunggah Dokumen Baru</a></span>
+                        <span class="toc-page">8</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">2.3</span>
+                        <span class="toc-text"><a href="#folder-memantau">Memantau Dokumen Masuk dan Keluar</a></span>
+                        <span class="toc-page">10</span>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <div class="toc-item-main">
+                    <span class="toc-num">03</span>
+                    <span class="toc-text"><a href="#modul-notion">Fitur Notion (Pusat Catatan & Kolaborasi)</a></span>
+                    <span class="toc-page">11</span>
+                </div>
+                <ul class="toc-sublist">
+                    <li>
+                        <span class="toc-num">3.1</span>
+                        <span class="toc-text"><a href="#notion-mengakses">Mengakses Workspace</a></span>
+                        <span class="toc-page">11</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">3.2</span>
+                        <span class="toc-text"><a href="#notion-halaman">Membuat dan Mengedit Halaman</a></span>
+                        <span class="toc-page">12</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">3.3</span>
+                        <span class="toc-text"><a href="#notion-ikon">Mengganti Ikon dan Cover Halaman</a></span>
+                        <span class="toc-page">13</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">3.4</span>
+                        <span class="toc-text"><a href="#notion-wiki">Mode Halaman Wiki / Catatan</a></span>
+                        <span class="toc-page">14</span>
+                    </li>
+                    <li>
+                        <span class="toc-num">3.5</span>
+                        <span class="toc-text"><a href="#notion-database">Menggunakan Mode Database</a></span>
+                        <span class="toc-page">15</span>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="page-num-footer">2</div>
+    </div>
 
-<h3>1.1. Mengakses Chat</h3>
-<ul>
-  <li>Klik ikon <strong>Chat (💬)</strong> pada panel navigasi di sebelah kiri (Activity Bar).</li>
-  <li>Anda akan melihat daftar <strong>Ruangan (Rooms)</strong> dan daftar <strong>Pengguna Online</strong>.</li>
-</ul>
+    <!-- Content Pages -->
+    <div class="page content-page">
+        <div class="top-nav">
+            <div>Pendahuluan</div>
+            <div class="nav-right">Resik Internal · Panduan Pengguna</div>
+        </div>
 
-<div class="screenshot">[Tambahkan Screenshot: Tampilan utama daftar Chat dan pengguna online di sini]</div>
+        <div class="page-header"
+            style="background: #f0eaff; display: inline-block; padding: 5px 15px; border-radius: 20px; letter-spacing: 1px; color: var(--primary);">
+            Selamat Datang</div>
+        <h1 class="page-title" id="pendahuluan">Mengenal Resik Internal</h1>
+        <p>Selamat datang di aplikasi <strong>Resik Internal</strong> — platform kolaborasi internal perusahaan yang
+            dirancang untuk mempermudah komunikasi tim, pengelolaan dokumen, dan pencatatan pekerjaan dalam satu tempat.
+            Aplikasi ini menghadirkan tiga fitur utama yang saling terintegrasi:</p>
 
-<h3>1.2. Membuat Ruangan Baru (Grup)</h3>
-<ol>
-  <li>Pada sidebar sebelah kiri, cari bagian <strong>💬 Ruangan</strong>.</li>
-  <li>Klik tombol <strong>+ (Buat Ruangan Baru)</strong> di sebelah kanan label.</li>
-  <li>Masukkan nama ruangan (contoh: <code>tim-marketing</code>).</li>
-  <li>Klik tombol <strong>Buat</strong>.</li>
-</ol>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon"></div>
+                <h4>Chat</h4>
+                <p>Komunikasi real-time melalui ruangan (grup) maupun pesan pribadi dengan rekan kerja.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"></div>
+                <h4>Folder Bersama</h4>
+                <p>Dokumentasi dan pelacakan surat/dokumen masuk & keluar antar divisi atau proyek.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"></div>
+                <h4>Notion Workspace</h4>
+                <p>Kanvas digital untuk mencatat, mendokumentasikan, dan melacak pekerjaan secara interaktif.</p>
+            </div>
+        </div>
 
-<div class="screenshot">[Tambahkan Screenshot: Modal pembuatan ruangan baru di sini]</div>
+        <div class="note">
+            <strong>Tentang panduan ini:</strong> Buku panduan ini menjelaskan langkah demi langkah cara menggunakan
+            setiap fitur utama Resik Internal, lengkap dengan tangkapan layar antarmuka aplikasi untuk memudahkan Anda
+            mengikuti setiap proses.
+        </div>
+        <div class="page-num-footer">3</div>
+    </div>
 
-<h3>1.3. Mengirim Pesan</h3>
-<ol>
-  <li>Pilih ruangan atau nama pengguna dari sidebar.</li>
-  <li>Ketik pesan Anda di kotak input bagian bawah.</li>
-  <li>Klik tombol <strong>Kirim (ikon panah)</strong> atau tekan tombol <code>Enter</code>.</li>
-</ol>
+    <!-- Chapter 1 -->
+    <div class="page content-page">
+        <div class="top-nav">
+            <div>01 — Fitur Chat</div>
+            <div class="nav-right">Resik Internal · Panduan Pengguna</div>
+        </div>
 
-<h3>1.4. Manajemen Anggota Ruangan</h3>
-<ul>
-  <li>Untuk melihat daftar anggota ruangan, klik ikon <strong>Anggota (👥)</strong> di pojok kanan atas area chat.</li>
-  <li>Untuk menambahkan anggota baru, buka panel anggota lalu klik tombol <strong>+ Tambah Anggota</strong>.</li>
-</ul>
+        <div class="page-header" style="color: var(--primary-light);">Modul Komunikasi</div>
+        <h1 class="page-title" id="modul-chat"><span
+                style="background: var(--primary); color: white; padding: 5px 15px; border-radius: 12px; margin-right: 15px;">01</span>Fitur
+            Chat (Percakapan)</h1>
 
-<div class="screenshot">[Tambahkan Screenshot: Panel anggota ruangan dan modal penambahan anggota di sini]</div>
+        <p>Fitur Chat memungkinkan Anda untuk berkomunikasi dengan rekan kerja secara <em>real-time</em>, baik melalui
+            grup (ruangan) maupun pesan pribadi (Direct Message).</p>
 
-<hr>
+        <h3 class="subsection-title" id="chat-mengakses"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">1.1</span>Mengakses
+            Chat</h3>
+        <ul>
+            <li>Klik ikon <strong>Chat</strong> pada panel navigasi di sebelah kiri (Activity Bar).</li>
+            <li>Anda akan melihat daftar <strong>Ruangan (Rooms)</strong> dan daftar <strong>Pengguna Online</strong>.
+            </li>
+        </ul>
+        <div class="image-placeholder">Gambar: Tampilan utama fitur Chat dengan daftar ruangan dan pengguna online</div>
 
-<h2>2. Fitur Folder Bersama (Manajemen Dokumen)</h2>
-<p>Fitur Folder Bersama digunakan untuk mendokumentasikan dan melacak surat/dokumen masuk dan keluar antar divisi atau proyek.</p>
+        <h3 class="subsection-title" id="chat-membuat-ruangan"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">1.2</span>Membuat
+            Ruangan Baru (Grup)</h3>
+        <ol class="step-list">
+            <li>Pada sidebar sebelah kiri, cari bagian <strong>Ruangan</strong>.</li>
+            <li>Klik tombol <strong>+ (Buat Ruangan Baru)</strong> di sebelah kanan label.</li>
+            <li>Masukkan nama ruangan (contoh: <em>tim-marketing</em>).</li>
+            <li>Klik tombol <strong>Buat</strong>.</li>
+        </ol>
+        <div class="image-placeholder">Gambar: Dialog pembuatan ruangan baru</div>
+        <div class="page-num-footer">4</div>
+    </div>
 
-<h3>2.1. Mengakses Folder Bersama</h3>
-<ul>
-  <li>Klik ikon <strong>Folder (📁)</strong> pada navigasi kiri (Activity Bar) atau klik menu <strong>Folder Bersama</strong> di sidebar.</li>
-</ul>
+    <div class="page content-page">
+        <div class="top-nav">
+            <div>01 — Fitur Chat</div>
+            <div class="nav-right">Resik Internal · Panduan Pengguna</div>
+        </div>
 
-<div class="screenshot">[Tambahkan Screenshot: Tampilan dasbor Folder Bersama beserta metrik statistik di sini]</div>
+        <h3 class="subsection-title" id="chat-mengirim-pesan"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">1.3</span>Mengirim
+            Pesan</h3>
+        <ol class="step-list">
+            <li>Pilih ruangan atau nama pengguna dari sidebar.</li>
+            <li>Ketik pesan Anda di kotak input bagian bawah.</li>
+            <li>Klik tombol <strong>Kirim (ikon panah)</strong> atau tekan tombol <strong>Enter</strong>.</li>
+        </ol>
+        <div class="image-placeholder">Gambar: Jendela percakapan dan kotak input pesan</div>
 
-<h3>2.2. Mengunggah Dokumen Baru</h3>
-<ol>
-  <li>Pada halaman Folder Bersama, klik tombol <strong>Unggah Dokumen</strong> di bagian atas (banner).</li>
-  <li>Akan muncul form pengisian, lengkapi data berikut:
-    <ul>
-      <li><strong>Tipe Dokumen & Sub-Tipe</strong> (contoh: PO Marketing)</li>
-      <li><strong>Proyek</strong></li>
-      <li><strong>Nomor & Nama Dokumen</strong></li>
-      <li><strong>Tanggal Dokumen</strong></li>
-      <li><strong>Deskripsi</strong> (opsional)</li>
-      <li><strong>Penerima Dokumen</strong></li>
-    </ul>
-  </li>
-  <li>Klik pada area <strong>Berkas File (📁)</strong> atau seret file (drag and drop) ke area tersebut (format yang didukung: <code>.pdf</code>, <code>.doc</code>, <code>.docx</code>, <code>.xls</code>, <code>.xlsx</code>).</li>
-  <li>Klik <strong>Upload Dokumen</strong>.</li>
-</ol>
+        <h3 class="subsection-title" id="chat-manajemen-anggota"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">1.4</span>Manajemen
+            Anggota Ruangan</h3>
+        <ul>
+            <li>Untuk melihat daftar anggota ruangan, klik ikon <strong>Anggota</strong> di pojok kanan atas area chat.
+            </li>
+            <li>Untuk menambahkan anggota baru, buka panel anggota lalu klik tombol <strong>+ Tambah Anggota</strong>.
+            </li>
+        </ul>
+        <div class="image-placeholder">Gambar: Panel manajemen anggota ruangan</div>
 
-<div class="screenshot">[Tambahkan Screenshot: Form Upload Dokumen Baru di sini]</div>
+        <div class="note">
+            <h4 style="color: var(--primary); margin-top: 0; font-size: 1.1em;">Kamus Tombol & Ikon - Modul Chat</h4>
+            <ul style="list-style-type: none; padding-left: 0; margin-bottom: 0; font-size: 0.95em;">
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Ikon Chat</span>
+                    <span>: Membuka panel utama Chat dari bilah navigasi kiri.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">+ Buat Ruangan
+                        Baru</span> <span>: Membuat grup percakapan baru untuk komunikasi banyak orang.</span></li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Ikon Panah
+                        (Kirim)</span> <span>: Mengirim teks atau pesan yang sudah diketik ke ruang obrolan.</span></li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Ikon Anggota</span>
+                    <span>: Menampilkan panel daftar peserta yang tergabung di ruangan tersebut.</span>
+                </li>
+                <li style="display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">+ Tambah Anggota</span>
+                    <span>: Mengundang peserta/rekan kerja baru ke dalam grup obrolan.</span>
+                </li>
+            </ul>
+        </div>
 
-<h3>2.3. Memantau Dokumen Masuk dan Keluar</h3>
-<ul>
-  <li>Di halaman utama Folder Bersama, terdapat tab <strong>Masuk</strong> dan <strong>Keluar</strong>.</li>
-  <li><strong>Masuk</strong>: Menampilkan dokumen yang ditujukan ke divisi/pengguna Anda.</li>
-  <li><strong>Keluar</strong>: Menampilkan dokumen yang Anda unggah/kirimkan.</li>
-  <li>Gunakan <strong>Kotak Pencarian</strong> atau filter <strong>Bulan & Tahun</strong> untuk mempermudah pencarian dokumen spesifik.</li>
-</ul>
+        <div class="page-num-footer">5</div>
+    </div>
 
-<div class="screenshot">[Tambahkan Screenshot: Tabel dokumen masuk dan keluar dengan filter di sini]</div>
+    <!-- Chapter 2 -->
+    <div class="page content-page">
+        <div class="top-nav">
+            <div>02 — Folder Bersama</div>
+            <div class="nav-right">Resik Internal · Panduan Pengguna</div>
+        </div>
 
-<hr>
+        <div class="page-header" style="color: var(--primary-light);">Modul Manajemen Dokumen</div>
+        <h1 class="page-title" id="modul-folder-bersama"><span
+                style="background: var(--primary); color: white; padding: 5px 15px; border-radius: 12px; margin-right: 15px;">02</span>Fitur
+            Folder Bersama</h1>
 
-<h2>3. Fitur Notion (Pusat Catatan & Kolaborasi)</h2>
-<p>Fitur Notion berfungsi sebagai kanvas digital untuk mencatat, membuat dokumentasi, dan melacak pekerjaan dengan berbagai tampilan interaktif (Database, Board, Calendar, dll).</p>
+        <p>Fitur Folder Bersama digunakan untuk mendokumentasikan dan melacak surat/dokumen masuk dan keluar antar
+            divisi atau proyek.</p>
 
-<h3>3.1. Mengakses Workspace</h3>
-<ul>
-  <li>Klik ikon <strong>Notion (📄)</strong> pada panel navigasi (Activity Bar).</li>
-</ul>
+        <h3 class="subsection-title" id="folder-mengakses"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">2.1</span>Mengakses
+            Folder Bersama</h3>
+        <ul>
+            <li>Klik ikon <strong>Folder</strong> pada navigasi kiri (Activity Bar) atau klik menu <strong>Folder
+                    Bersama</strong> di sidebar.</li>
+        </ul>
+        <div class="image-placeholder">Gambar: Halaman utama Folder Bersama</div>
 
-<div class="screenshot">[Tambahkan Screenshot: Tampilan Halaman Utama Notion Workspace di sini]</div>
+        <h3 class="subsection-title" id="folder-mengunggah"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">2.2</span>Mengunggah
+            Dokumen Baru</h3>
+        <ol class="step-list">
+            <li>Pada halaman Folder Bersama, klik tombol <strong>Unggah Dokumen</strong> di bagian atas (banner).</li>
+            <li>Akan muncul form pengisian, lengkapi data berikut:
+                <ul>
+                    <li>Tipe Dokumen & Sub-Tipe</li>
+                    <li>Proyek</li>
+                    <li>Nomor & Nama Dokumen</li>
+                    <li>Tanggal Dokumen</li>
+                    <li>Deskripsi (opsional)</li>
+                    <li>Penerima Dokumen</li>
+                </ul>
+            </li>
+            <li>Klik pada area <strong>Berkas File</strong> atau seret file (drag and drop) ke area tersebut (format
+                yang didukung: .pdf, .doc, .docx, .xls, .xlsx).</li>
+            <li>Klik <strong>Upload Dokumen</strong>.</li>
+        </ol>
+        <div class="image-placeholder">Gambar: Form pengisian data dokumen (bagian 1)</div>
+        <div class="page-num-footer">7</div>
+    </div>
 
-<h3>3.2. Membuat dan Mengedit Halaman</h3>
-<ol>
-  <li>Untuk membuat halaman (sub-halaman) baru, klik tombol <strong>+ Halaman Baru</strong> di pojok kanan atas.</li>
-  <li>Untuk mengubah konten halaman yang sedang aktif, klik tombol <strong>Edit</strong>.</li>
-  <li>Saat mode edit aktif, gunakan toolbar untuk memformat teks:
-    <ul>
-      <li><code>H</code> untuk Heading (Judul)</li>
-      <li><code>•</code> untuk Bullet List</li>
-      <li><code>B</code> untuk huruf tebal (Bold)</li>
-      <li><code>I</code> untuk huruf miring (Italic)</li>
-    </ul>
-  </li>
-  <li>Klik <strong>Simpan</strong> setelah selesai.</li>
-</ol>
+    <div class="page content-page">
+        <div class="top-nav">
+            <div>02 — Folder Bersama</div>
+            <div class="nav-right">Resik Internal · Panduan Pengguna</div>
+        </div>
 
-<div class="screenshot">[Tambahkan Screenshot: Tampilan Mode Edit Halaman Notion di sini]</div>
+        <div class="image-placeholder">Gambar: Form pengisian data dokumen (bagian 2)</div>
+        <div class="image-placeholder">Gambar: Area unggah berkas dan tombol Upload Dokumen</div>
 
-<h3>3.3. Mengganti Ikon dan Cover Halaman</h3>
-<ul>
-  <li><strong>Ikon Halaman</strong>: Klik ikon emoji di sebelah kiri judul halaman (contoh: 📄) untuk memilih emoji baru dari menu <em>pop-up</em>.</li>
-  <li><strong>Cover Halaman</strong>: Klik tombol <strong>Ganti Cover</strong> di sudut kanan atas area header (gradien warna) untuk memperbarui latar belakang <em>header</em> halaman.</li>
-</ul>
+        <h3 class="subsection-title" id="folder-memantau"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">2.3</span>Memantau
+            Dokumen Masuk dan Keluar</h3>
+        <ul>
+            <li>Di halaman utama Folder Bersama, terdapat tab <strong>Masuk</strong> dan <strong>Keluar</strong>.</li>
+            <li><strong>Masuk:</strong> Menampilkan dokumen yang ditujukan ke divisi/pengguna Anda.</li>
+            <li><strong>Keluar:</strong> Menampilkan dokumen yang Anda unggah/kirimkan.</li>
+            <li>Gunakan <strong>Kotak Pencarian</strong> atau filter <strong>Bulan & Tahun</strong> untuk mempermudah
+                pencarian dokumen spesifik.</li>
+        </ul>
+        <div class="image-placeholder">Gambar: Tab pemantauan dokumen Masuk dan Keluar</div>
 
-<h3>3.4. Menggunakan Mode Database</h3>
-<p>Notion Workspace mendukung manajemen tugas/data yang terstruktur jika Anda menggunakan halaman bertipe <em>Database</em>.</p>
-<ul>
-  <li>Ubah tampilan data menggunakan tab: <strong>Table</strong>, <strong>Board</strong>, <strong>Calendar</strong>, <strong>Gallery</strong>, <strong>List</strong>, atau <strong>Timeline</strong>.</li>
-  <li>Gunakan menu <strong>Filter</strong> (Status, Priority, Assignee) untuk menyaring data yang ditampilkan.</li>
-  <li>Klik <strong>+ Baris Baru</strong> untuk menambahkan <em>item</em> tugas/data baru ke dalam database.</li>
-</ul>
+        <div class="note">
+            <h4 style="color: var(--primary); margin-top: 0; font-size: 1.1em;">Kamus Tombol & Ikon - Folder Bersama
+            </h4>
+            <ul style="list-style-type: none; padding-left: 0; margin-bottom: 0; font-size: 0.95em;">
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Ikon Folder</span>
+                    <span>: Membuka modul manajemen dokumen dari panel navigasi.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Unggah Dokumen</span>
+                    <span>: Tombol utama di halaman depan untuk memulai proses pengiriman/penyimpanan dokumen
+                        baru.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Area Berkas File</span>
+                    <span>: Kotak area untuk memilih dokumen dari komputer Anda (bisa di-klik atau ditarik ke dalam
+                        kotak).</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Upload Dokumen</span>
+                    <span>: Menyimpan dan mengirimkan dokumen beserta formulir yang telah diisi ke sistem.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Tab Masuk /
+                        Keluar</span> <span>: Berpindah tampilan antara daftar surat yang ditujukan ke Anda (Masuk) vs.
+                        surat yang Anda buat/kirim (Keluar).</span></li>
+                <li style="display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Kotak Pencarian</span>
+                    <span>: Melakukan filter cepat untuk mencari dokumen spesifik berdasarkan nama, nomor, atau
+                        proyek.</span>
+                </li>
+            </ul>
+        </div>
 
-<div class="screenshot">[Tambahkan Screenshot: Tampilan Database dengan Tab Board/Table dan Filter aktif di sini]</div>
+        <div class="page-num-footer">8</div>
+    </div>
 
-<hr>
+    <!-- Chapter 3 -->
+    <div class="page content-page">
+        <div class="top-nav">
+            <div>03 — Workspace</div>
+            <div class="nav-right">Resik Internal · Panduan Pengguna</div>
+        </div>
 
-<div class="note">
-  <strong>Tip:</strong> Navigasi antar fitur sangat mudah, cukup gunakan tombol-tombol utama (Chat, Notion, Folder) di panel Activity Bar (sebelah paling kiri layar) kapan pun Anda membutuhkannya.
-</div>
+        <div class="page-header" style="color: var(--primary-light);">Modul Kolaborasi & Catatan</div>
+        <h1 class="page-title" id="modul-notion"><span
+                style="background: var(--primary); color: white; padding: 5px 15px; border-radius: 12px; margin-right: 15px;">03</span>Fitur
+            Workspace</h1>
+
+        <p>Fitur Workspace berfungsi sebagai kanvas digital untuk mencatat, membuat dokumentasi, dan melacak pekerjaan
+            dengan dua mode utama: <strong>Halaman Catatan (Wiki)</strong> untuk teks bebas dan <strong>Database</strong>
+            untuk data terstruktur dengan berbagai tampilan interaktif (Table, Board, Calendar, Gallery, List, dan
+            Timeline).</p>
+
+        <h3 class="subsection-title" id="notion-mengakses"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">3.1</span>Mengakses
+            Workspace</h3>
+        <ul>
+            <li>Klik ikon <strong>Workspace</strong> pada panel navigasi (Activity Bar).</li>
+        </ul>
+        <div class="image-placeholder">Gambar: Tampilan Workspace</div>
+
+        <h3 class="subsection-title" id="notion-halaman"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">3.2</span>Membuat
+            dan Mengedit Halaman</h3>
+        <ol class="step-list">
+            <li>Untuk membuat halaman (sub-halaman) baru, klik tombol <strong>+ Halaman Baru</strong> di pojok kanan
+                atas.</li>
+            <li>Untuk mengubah konten halaman yang sedang aktif, klik tombol <strong>Edit</strong>.</li>
+            <li>Saat mode edit aktif, gunakan toolbar untuk memformat teks:
+                <ul>
+                    <li><strong>H</strong> — Heading (Judul)</li>
+                    <li><strong>•</strong> — Bullet List</li>
+                    <li><strong>B</strong> — Bold</li>
+                    <li><strong>I</strong> — Italic</li>
+                </ul>
+            </li>
+            <li>Klik <strong>Simpan</strong> setelah selesai.</li>
+        </ol>
+        <div class="image-placeholder">Gambar: Mode edit halaman dengan toolbar pemformatan teks</div>
+        <div class="page-num-footer">11</div>
+    </div>
+
+    <div class="page content-page">
+        <div class="top-nav">
+            <div>03 — Workspace</div>
+            <div class="nav-right">Resik Internal · Panduan Pengguna</div>
+        </div>
+
+        <h3 class="subsection-title" id="notion-ikon"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">3.3</span>Mengganti
+            Ikon dan Cover Halaman</h3>
+        <ul>
+            <li><strong>Ikon Halaman:</strong> Klik ikon emoji di sebelah kiri judul halaman untuk memilih emoji baru
+                dari menu pop-up.</li>
+            <li><strong>Cover Halaman:</strong> Klik tombol <strong>Ganti Cover</strong> di sudut kanan atas area header
+                (gradien warna) untuk memperbarui latar belakang header halaman.</li>
+        </ul>
+
+        <h3 class="subsection-title" id="notion-wiki"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">3.4</span>Mode
+            Halaman Wiki / Catatan</h3>
+        <p>Workspace memiliki dua jenis halaman utama: <strong>Halaman Catatan (Wiki)</strong> dan <strong>Halaman
+                Database</strong>. Halaman Catatan digunakan untuk menulis dokumentasi, notulen rapat, catatan proyek, atau
+            materi kolaborasi bebas dalam format teks kaya (rich text).</p>
+        <ul>
+            <li>Setiap halaman baru yang dibuat secara default bertipe <strong>Catatan (Wiki)</strong>.</li>
+            <li>Klik tombol <strong>Edit</strong> untuk membuka editor Summernote. Anda bisa memformat teks dengan heading,
+                bold, italic, daftar bernomor/bullet, menyisipkan gambar, tautan, dan tabel.</li>
+            <li>Gunakan tombol <strong>Simpan</strong> untuk menyimpan perubahan konten, atau <strong>Batal</strong> untuk
+                membatalkan.</li>
+            <li>Setiap halaman bisa memiliki <strong>Sub-halaman</strong> (anak halaman) untuk membuat struktur
+                dokumentasi hierarkis.</li>
+            <li>Klik tombol <strong>+ Halaman Baru</strong> untuk membuat sub-halaman di bawah halaman yang sedang aktif.
+            </li>
+        </ul>
+        <div class="image-placeholder">Gambar: Tampilan halaman catatan (Wiki) dengan editor Summernote</div>
+
+        <h4 style="color: var(--primary-light); margin-top: 24px; font-size: 1.05em;">Pengaturan Akses Halaman</h4>
+        <p>Setiap halaman memiliki pengaturan akses untuk mengontrol siapa yang bisa melihatnya:</p>
+        <ul>
+            <li><strong>Public</strong> — Semua pengguna yang sudah login bisa melihat halaman ini.</li>
+            <li><strong>Role-based</strong> — Hanya pengguna dengan level tertentu (Staff, Management, atau Top
+                Management) yang bisa mengakses.</li>
+            <li><strong>Divisi</strong> — Hanya anggota divisi tertentu (Marketing, SDM, Keuangan, Operasional) yang
+                bisa mengakses.</li>
+        </ul>
+        <p>Untuk mengubah pengaturan akses, klik tombol <strong>Akses</strong> di pojok kanan atas saat mode edit aktif,
+            lalu pilih tipe akses yang diinginkan.</p>
+
+        <h3 class="subsection-title" id="notion-database"><span
+                style="background: var(--primary); color: white; padding: 4px 10px; border-radius: 8px; margin-right: 10px; font-size: 0.8em;">3.5</span>Menggunakan
+            Mode Database</h3>
+        <p>Workspace mendukung manajemen tugas/data yang terstruktur jika Anda menggunakan halaman bertipe
+            Database.</p>
+        <ul>
+            <li>Ubah tampilan data menggunakan tab: <strong>Table, Board, Calendar, Gallery, List,</strong> atau
+                <strong>Timeline</strong>.
+            </li>
+            <li>Gunakan menu <strong>Filter</strong> (Status, Priority, Assignee) untuk menyaring data yang ditampilkan.
+            </li>
+            <li>Klik <strong>+ Baris Baru</strong> untuk menambahkan item tugas/data baru ke dalam database.</li>
+        </ul>
+        <div class="image-placeholder">Gambar: Tampilan Database dengan berbagai mode tampilan</div>
+
+        <div class="note">
+            <h4 style="color: var(--primary); margin-top: 0; font-size: 1.1em;">Kamus Tombol & Ikon - Workspace
+            </h4>
+            <ul style="list-style-type: none; padding-left: 0; margin-bottom: 0; font-size: 0.95em;">
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">+ Halaman Baru</span>
+                    <span>: Membuat dokumen catatan baru yang kosong di dalam folder yang aktif.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Tombol Edit</span>
+                    <span>: Membuka halaman ke mode pengeditan agar konten (teks, gambar, tabel) dapat dimodifikasi.
+                        Berlaku untuk halaman Catatan maupun Database.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Tombol Simpan</span>
+                    <span>: Menyimpan dan mengonfirmasi semua perubahan konten ke server secara permanen.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Tombol Batal</span>
+                    <span>: Membatalkan pengeditan dan mengembalikan konten ke versi terakhir yang tersimpan.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Ganti Cover &
+                        Ikon</span> <span>: Membuka jendela khusus (pop-up) untuk memilih gambar header dan emoji yang
+                        merepresentasikan halaman.</span></li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Tombol Akses</span>
+                    <span>: Mengatur siapa yang boleh melihat halaman berdasarkan peran (role) atau divisi.</span>
+                </li>
+                <li style="margin-bottom: 10px; display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">Menu Filter</span>
+                    <span>: Menyaring data tabel berdasarkan prioritas, status (mis. 'Done', 'In Progress'), atau
+                        parameter lainnya.</span>
+                </li>
+                <li style="display: flex;"><span
+                        style="font-weight: 600; min-width: 180px; color: var(--primary-light);">+ Baris Baru</span>
+                    <span>: Menambahkan entri data baru ke bagian bawah tampilan tabel (Database).</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="note">
+            <strong>Tip:</strong> Navigasi antar fitur sangat mudah, cukup gunakan tombol-tombol utama (Chat, Workspace,
+            Folder) di panel Activity Bar (sebelah paling kiri layar) kapan pun Anda membutuhkannya.
+        </div>
+        <div class="page-num-footer">13</div>
+    </div>
+
+    <!-- Closing Page -->
+    <div class="page content-page closing-page">
+        <div class="closing-icon">✦</div>
+        <div class="closing-title">Terima Kasih</div>
+        <p>Panduan ini mencakup tiga fitur utama Resik Internal.<br>Untuk bantuan lebih lanjut, silakan hubungi tim IT
+            Support internal perusahaan Anda.</p>
+
+        <div class="closing-badges">
+            <div class="badge">Chat</div>
+            <div class="badge">Folder Bersama</div>
+            <div class="badge">Workspace</div>
+        </div>
+
+        <div
+            style="position: absolute; bottom: 50px; left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 80px; text-transform: uppercase; font-size: 0.8em; color: var(--primary); font-weight: 600;">
+            <div>Penutup</div>
+            <div style="color: var(--text-muted); font-weight: normal;">Resik Internal · Panduan Pengguna</div>
+        </div>
+    </div>
 
 </body>
+
 </html>

@@ -3616,11 +3616,11 @@ function renderTable(rows) {
 
     html += `
       <tr data-row-id="${row.id}">
-        <td class="table-cell-title" onclick="openNotionPeek('${row.id}')" style="vertical-align: middle;">
+        <td class="table-cell-title" onclick="openNotionPeek('${row.id}')">
           <span style="margin-right: 6px; line-height: 1;">${icon}</span>
           <span class="row-title-text">${esc(row.title)}</span>
         </td>
-        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; cursor: pointer; vertical-align: middle; line-height: 1.4;" onclick="openNotionPeek('${row.id}')" title="${esc(stripHtml(row.content || ''))}">${esc(truncateText(row.content, 60))}</td>
+        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; cursor: pointer; display: flex; align-items: center; line-height: 1.4;" onclick="openNotionPeek('${row.id}')" title="${esc(stripHtml(row.content || ''))}">${esc(truncateText(row.content, 60))}</td>
         <td>
           <select onchange="updateRowPropertyDirect('${row.id}', 'status', this.value)" class="notion-prop-select ${status.replace(' ', '-').toLowerCase()}">
             <option value="To Do" ${status === 'To Do' ? 'selected' : ''}>To Do</option>

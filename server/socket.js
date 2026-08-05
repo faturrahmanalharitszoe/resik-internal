@@ -1,6 +1,13 @@
 const db = require('./db');
 
+function stripHtmlTags(str) {
+  if (!str) return '';
+  return str.replace(/<[^>]*>/g, '');
+}
+
 module.exports = function setupSocket(io) {
+  const typingTimestamps = new Map();
+
   io.on('connection', (socket) => {
     const user = socket.user;
     console.log(`[Socket] Connected: ${user.display_name} (${socket.id})`);
@@ -43,6 +50,9 @@ module.exports = function setupSocket(io) {
         return callback?.({ error: 'Data tidak lengkap' });
       }
 
+      // Sanitize: strip HTML tags from text content
+      const sanitizedContent = type === 'text' ? stripHtmlTags(content) : content;
+
       try {
         // Verify membership
         const member = await db.query(
@@ -53,11 +63,17 @@ module.exports = function setupSocket(io) {
           return callback?.({ error: 'Bukan anggota room ini' });
         }
 
+        // Truncate overly long messages
+        const maxContentLength = 5000;
+        const finalContent = sanitizedContent && sanitizedContent.length > maxContentLength
+          ? sanitizedContent.substring(0, maxContentLength)
+          : sanitizedContent;
+
         const result = await db.query(
           `INSERT INTO messages (room_id, sender_id, content, type, file_url, file_name, file_size)
            VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING id, room_id, content, type, file_url, file_name, file_size, created_at`,
-          [room_id, user.id, content, type, file_url, file_name, file_size]
+          [room_id, user.id, finalContent, type, file_url, file_name, file_size]
         );
 
         const message = {
@@ -76,8 +92,16 @@ module.exports = function setupSocket(io) {
       }
     });
 
-    // Typing indicator
+    // Typing indicator (rate-limited: max once per second per user)
     socket.on('typing', ({ room_id, is_typing }) => {
+      const now = Date.now();
+      const key = `${user.id}:${room_id}`;
+      const lastTyping = typingTimestamps.get(key) || 0;
+
+      // Throttle: allow typing signal only once per second
+      if (now - lastTyping < 1000) return;
+      typingTimestamps.set(key, now);
+
       socket.to(room_id).emit('user_typing', {
         user_id: user.id,
         display_name: user.display_name,
@@ -89,7 +113,7 @@ module.exports = function setupSocket(io) {
     // Delete message
     socket.on('delete_message', async ({ message_id, room_id }, callback) => {
       try {
-        const isAdmin = user.is_admin || user.username === 'admin' || user.username === 'administrator';
+        const isAdmin = !!user.is_admin;
 
         let query = 'UPDATE messages SET is_deleted = true WHERE id = $1 ';
         let params = [message_id];
@@ -117,6 +141,13 @@ module.exports = function setupSocket(io) {
     // Disconnect
     socket.on('disconnect', async () => {
       console.log(`[Socket] Disconnected: ${user.display_name}`);
+
+      // Cleanup typing rate limit entries
+      for (const [key] of typingTimestamps) {
+        if (key.startsWith(`${user.id}:`)) {
+          typingTimestamps.delete(key);
+        }
+      }
 
       await db.query(
         'UPDATE users SET is_online = false, last_seen = NOW() WHERE id = $1',

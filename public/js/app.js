@@ -648,17 +648,10 @@ function connectSocket() {
     });
   });
 
-  socket.on('message_deleted', ({ message_id }) => {
-    const el = document.querySelector(`[data-msg-id="${message_id}"]`);
-    if (el) el.closest('.msg-group')?.remove();
-  });
-
   // Member panel real-time events
   socket.on('member_added', ({ room_id, user }) => {
-    // Update cached room member_count
     const room = rooms.find(r => r.id === room_id);
     if (room) room.member_count = (room.member_count || 0) + 1;
-    // Live-refresh panel if currently viewing this room
     if (room_id === currentRoomId) {
       loadRoomMembers(room_id);
       const memberCount = room ? room.member_count : '?';

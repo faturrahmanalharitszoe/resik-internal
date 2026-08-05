@@ -87,7 +87,7 @@ router.get('/counts', async (req, res) => {
     let paramsOut = [displayName];
 
     // For OUT: mirror the frontend "keluar" tab logic
-    if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
+    if (role === 'top management' || user.is_admin) {
       // Admin/Top management sees all documents (uses "semua" tab), so keluar = all docs
       totalOutQuery = 'SELECT COUNT(*) FROM shared_documents';
       todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE tgl >= CURRENT_DATE';
@@ -104,7 +104,7 @@ router.get('/counts', async (req, res) => {
       paramsOut = [displayName];
     }
 
-    if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
+    if (role === 'top management' || user.is_admin) {
       totalInQuery = 'SELECT COUNT(*) FROM shared_documents';
       todayInQuery = 'SELECT COUNT(*) FROM shared_documents WHERE tgl >= CURRENT_DATE';
       paramsIn = [];
@@ -209,7 +209,7 @@ router.get('/', async (req, res) => {
     let query = '';
     let params = [];
 
-    if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
+    if (role === 'top management' || user.is_admin) {
       // Direktur sees all documents
       query = `
         SELECT d.*, COALESCE(d.sender_division, u.division) AS sender_division
@@ -605,7 +605,7 @@ async function checkDocumentAccess(doc, user) {
   const division = user.division;
   const jabatan = user.jabatan || 'Staff';
 
-  if (role === 'top management' || user.is_admin || user.username === 'admin' || user.username === 'administrator') {
+  if (role === 'top management' || user.is_admin) {
     return true;
   }
 

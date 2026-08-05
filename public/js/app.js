@@ -1029,6 +1029,20 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
+function stripHtml(html) {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
+function truncateText(text, maxLen) {
+  if (!text) return '';
+  const clean = stripHtml(text).trim();
+  if (clean.length <= maxLen) return clean;
+  return clean.substring(0, maxLen) + '...';
+}
+
 function getTagClassForRecipient(rec) {
   const r = rec.toLowerCase();
   if (r.includes('marketing')) return 'tag-red';
@@ -3577,6 +3591,7 @@ function renderTable(rows) {
       <thead>
         <tr>
           <th>Judul</th>
+          <th>Deskripsi</th>
           <th>Status</th>
           <th>Prioritas</th>
           <th>Divisi</th>
@@ -3605,6 +3620,7 @@ function renderTable(rows) {
           <span style="margin-right: 6px;">${icon}</span>
           <span class="row-title-text">${esc(row.title)}</span>
         </td>
+        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; cursor: pointer;" onclick="openNotionPeek('${row.id}')" title="${esc(stripHtml(row.content || ''))}">${esc(truncateText(row.content, 60))}</td>
         <td>
           <select onchange="updateRowPropertyDirect('${row.id}', 'status', this.value)" class="notion-prop-select ${status.replace(' ', '-').toLowerCase()}">
             <option value="To Do" ${status === 'To Do' ? 'selected' : ''}>To Do</option>
@@ -3787,6 +3803,7 @@ function renderBoard(rows) {
           <span style="font-size: 16px;">${icon}</span>
           <span>${esc(task.title)}</span>
         </div>
+        ${task.content ? `<div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${esc(truncateText(task.content, 80))}</div>` : ''}
         <div class="notion-board-card-props">
           <span class="${priorityTagClass}">${priority}</span>
           ${props.assignee ? `<span class="tag-pill tag-gray">${esc(props.assignee.toUpperCase())}</span>` : ''}
@@ -3913,7 +3930,8 @@ function renderCalendar(rows) {
       const props = typeof task.properties === 'string' ? JSON.parse(task.properties) : (task.properties || {});
       const status = props.status || 'To Do';
       taskDiv.classList.add(status.replace(' ', '-').toLowerCase());
-      taskDiv.textContent = `${task.icon || '📄'} ${task.title}`;
+      const descSnippet = truncateText(task.content, 30);
+      taskDiv.innerHTML = `<span>${task.icon || '📄'} ${esc(task.title)}</span>${descSnippet ? `<span style="display:block;font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;margin-top:1px;">${esc(descSnippet)}</span>` : ''}`;
 
       cell.appendChild(taskDiv);
     });
@@ -3977,6 +3995,7 @@ function renderGallery(rows) {
            <span style="font-size: 16px;">${icon}</span>
            <span>${esc(row.title)}</span>
          </div>
+         ${row.content ? `<div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${esc(truncateText(row.content, 80))}</div>` : ''}
          <div class="notion-gallery-card-props">
            <span class="tag-pill tag-${status === 'Done' ? 'green' : status === 'In Progress' ? 'yellow' : 'gray'}">${status}</span>
            ${props.assignee ? `<span class="tag-pill tag-blue">${esc(props.assignee.toUpperCase())}</span>` : ''}
@@ -4027,8 +4046,13 @@ function renderList(rows) {
     item.innerHTML = `
        <div class="notion-list-item-left">
          <input type="checkbox" ${isDone ? 'checked' : ''} onclick="event.stopPropagation(); toggleListTaskStatus('${row.id}', '${status}')" style="cursor: pointer; width: 15px; height: 15px;" />
-         <span style="font-size: 16px;">${icon}</span>
-         <span class="list-item-title"${titleStrikethrough}>${esc(row.title)}</span>
+         <div>
+           <div style="display: flex; align-items: center; gap: 6px;">
+             <span style="font-size: 16px;">${icon}</span>
+             <span class="list-item-title"${titleStrikethrough}>${esc(row.title)}</span>
+           </div>
+           ${row.content ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;">${esc(truncateText(row.content, 50))}</div>` : ''}
+         </div>
        </div>
        <div class="notion-list-item-right">
          <span class="tag-pill tag-${priority === 'High' ? 'red' : priority === 'Medium' ? 'yellow' : 'gray'}">${priority}</span>
@@ -4137,7 +4161,8 @@ function renderTimeline(rows) {
     leftCell.style.cursor = 'pointer';
     leftCell.style.background = 'var(--bg)';
     leftCell.onclick = () => openNotionPeek(row.id);
-    leftCell.innerHTML = `<span style="margin-right: 4px;">${row.icon || '📄'}</span><strong>${esc(row.title)}</strong>`;
+    const timelineDesc = truncateText(row.content, 30);
+    leftCell.innerHTML = `<div><span style="margin-right: 4px;">${row.icon || '📄'}</span><strong>${esc(row.title)}</strong></div>${timelineDesc ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(timelineDesc)}</div>` : ''}`;
     grid.appendChild(leftCell);
 
     let startDayIdx = null;

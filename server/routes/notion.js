@@ -82,7 +82,7 @@ router.get('/pages/:id', async (req, res) => {
     
     // Fetch children (only those user can access)
     const childrenRes = await db.query(
-      'SELECT id, title, icon, parent_id, is_database, database_view, properties, access_level, allowed_divisions, created_at, updated_at FROM notion_pages WHERE parent_id = $1 ORDER BY created_at ASC',
+      'SELECT id, title, content, icon, parent_id, is_database, database_view, properties, access_level, allowed_divisions, created_at, updated_at FROM notion_pages WHERE parent_id = $1 ORDER BY created_at ASC',
       [id]
     );
     

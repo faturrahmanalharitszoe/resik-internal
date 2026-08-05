@@ -3284,9 +3284,6 @@ html[data-theme="dark"] .btn-cover-action:hover {
 
 .notion-table-cell-title,
 .table-cell-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-weight: 500;
   color: var(--text-primary);
   cursor: pointer;

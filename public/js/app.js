@@ -4990,6 +4990,44 @@ async function bulkDeleteAdminUsers() {
 }
 window.bulkDeleteAdminUsers = bulkDeleteAdminUsers;
 
+// Export Admin Users to Excel
+function exportAdminUsersExcel() {
+  if (typeof XLSX === 'undefined') {
+    Swal.fire('Gagal!', 'Library Excel tidak tersedia.', 'error');
+    return;
+  }
+
+  const divisionLabels = {
+    marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+    it: 'IT'
+  };
+
+  const rows = adminUsersList.map((u, idx) => ({
+    'No': idx + 1,
+    'Nama Lengkap': toTitleCase(u.display_name || ''),
+    'Username': u.username || '',
+    'Email': u.email || '',
+    'Divisi': divisionLabels[u.division] || u.division || '-',
+    'Jabatan': u.jabatan || '-',
+    'Role': u.role || '-',
+    'Admin': u.is_admin ? 'Ya' : 'Tidak',
+    'Password': ''
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 5 }, { wch: 25 }, { wch: 18 }, { wch: 30 },
+    { wch: 15 }, { wch: 20 }, { wch: 16 }, { wch: 8 }, { wch: 20 }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daftar User');
+  XLSX.writeFile(wb, `daftar-user-${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+  Swal.fire('Berhasil!', `File Excel dengan ${rows.length} user berhasil diunduh.`, 'success');
+}
+window.exportAdminUsersExcel = exportAdminUsersExcel;
+
 function sortAdminUsers(field) {
   if (adminSortField === field) {
     adminSortDir = adminSortDir === 'asc' ? 'desc' : 'asc';

@@ -4194,6 +4194,7 @@ html[data-theme="dark"] .btn-cover-action:hover {
 
 .activity-icon-btn svg {
   stroke: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .activity-icon-btn:hover svg {

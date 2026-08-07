@@ -5339,6 +5339,39 @@ async function handleAdminResetPwdSubmit(e) {
 }
 window.handleAdminResetPwdSubmit = handleAdminResetPwdSubmit;
 
+// Change Password (user self)
+async function handleChangePassword(e) {
+  e.preventDefault();
+  const oldPwd = document.getElementById('change-pwd-old').value;
+  const newPwd = document.getElementById('change-pwd-new').value;
+  const confirmPwd = document.getElementById('change-pwd-confirm').value;
+  const errorEl = document.getElementById('change-pwd-error');
+  errorEl.textContent = '';
+
+  if (newPwd !== confirmPwd) {
+    errorEl.textContent = 'Password baru dan konfirmasi tidak cocok.';
+    return;
+  }
+
+  try {
+    const res = await apiFetch('/api/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+    });
+    if (res.ok) {
+      document.getElementById('modal-change-pwd-overlay').classList.add('hidden');
+      document.getElementById('change-pwd-form').reset();
+      showToast('Password berhasil diubah!', 'success');
+    } else {
+      const data = await res.json();
+      errorEl.textContent = data.error || 'Gagal mengubah password.';
+    }
+  } catch (err) {
+    errorEl.textContent = 'Terjadi kesalahan jaringan.';
+  }
+}
+window.handleChangePassword = handleChangePassword;
+
 // Delete User
 async function deleteAdminUser(userId) {
   if (userId === currentUser.id) {

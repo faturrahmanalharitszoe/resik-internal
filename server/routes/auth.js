@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -151,6 +152,43 @@ router.post('/login', async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/auth/change-password
+router.put('/change-password', authMiddleware, async (req, res) => {
+  const { old_password, new_password } = req.body;
+
+  if (!old_password || !new_password) {
+    return res.status(400).json({ error: 'Password lama dan baru wajib diisi' });
+  }
+
+  if (new_password.length < 6) {
+    return res.status(400).json({ error: 'Password baru minimal 6 karakter' });
+  }
+
+  if (old_password === new_password) {
+    return res.status(400).json({ error: 'Password baru tidak boleh sama dengan password lama' });
+  }
+
+  try {
+    const result = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+    }
+
+    const valid = await bcrypt.compare(old_password, result.rows[0].password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Password lama salah' });
+    }
+
+    const password_hash = await bcrypt.hash(new_password, 12);
+    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [password_hash, req.user.id]);
+
+    res.json({ message: 'Password berhasil diubah' });
+  } catch (err) {
+    console.error('Change password error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

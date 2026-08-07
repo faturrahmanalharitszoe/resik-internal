@@ -173,13 +173,21 @@
           <span class="online-dot"></span>
           <span class="user-name" id="sidebar-name">User</span>
         </div>
-        <button id="btn-sidebar-collapse" class="icon-btn" title="Ciutkan Sidebar" style="margin-left: auto;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
+        <div style="display:flex;gap:2px;">
+          <button class="icon-btn" title="Ganti Password" onclick="document.getElementById('modal-change-pwd-overlay').classList.remove('hidden')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0110 0v4"/>
+            </svg>
+          </button>
+          <button id="btn-sidebar-collapse" class="icon-btn" title="Ciutkan Sidebar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="sidebar-section menu-section">
@@ -1248,6 +1256,33 @@
         <div class="modal-doc-footer">
           <button type="submit" class="btn-primary-sm">Simpan Pengguna</button>
         </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Change Password -->
+  <div id="modal-change-pwd-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Ganti Password</h3>
+        <button class="icon-btn"
+          onclick="document.getElementById('modal-change-pwd-overlay').classList.add('hidden')">✕</button>
+      </div>
+      <form id="change-pwd-form" class="auth-form" onsubmit="handleChangePassword(event)">
+        <div class="field">
+          <label>Password Lama</label>
+          <input type="password" id="change-pwd-old" required autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Password Baru</label>
+          <input type="password" id="change-pwd-new" required minlength="6" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Konfirmasi Password Baru</label>
+          <input type="password" id="change-pwd-confirm" required minlength="6" autocomplete="off" />
+        </div>
+        <div id="change-pwd-error" class="error-msg"></div>
+        <button type="submit" class="btn-primary">Simpan Password</button>
       </form>
     </div>
   </div>

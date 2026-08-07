@@ -5372,6 +5372,16 @@ async function handleChangePassword(e) {
 }
 window.handleChangePassword = handleChangePassword;
 
+// Toggle password visibility (show/hide)
+window.togglePasswordVisibility = function (inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.classList.toggle('active', isHidden);
+  btn.setAttribute('aria-label', isHidden ? 'Sembunyikan password' : 'Lihat password');
+};
+
 // Delete User
 async function deleteAdminUser(userId) {
   if (userId === currentUser.id) {

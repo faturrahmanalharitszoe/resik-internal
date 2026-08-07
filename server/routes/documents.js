@@ -75,115 +75,60 @@ router.get('/counts', async (req, res) => {
   try {
     const user = req.user;
     const displayName = user.display_name;
-    const role = user.role || 'staff';
     const division = user.division;
     const jabatan = user.jabatan || 'Staff';
 
-    let totalInQuery = '';
-    let todayInQuery = '';
-    let totalOutQuery = '';
-    let todayOutQuery = '';
-    let paramsIn = [];
-    let paramsOut = [displayName];
+    // Build the full list of group labels the current user belongs to (for "masuk")
+    const userGroups = [displayName];
+    const divisionLabels = {
+      marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
+      it: 'IT'
+    };
+    const mappedDiv = divisionLabels[division] || division;
+    const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
+    const userLevel = jabatanHierarchy.indexOf(jabatan);
 
-    // For OUT: mirror the frontend "keluar" tab logic
-    if (role === 'top management' || user.is_admin) {
-      // Admin/Top management sees all documents (uses "semua" tab), so keluar = all docs
-      totalOutQuery = 'SELECT COUNT(*) FROM shared_documents';
-      todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE tgl >= CURRENT_DATE';
-      paramsOut = [];
-    } else if (role === 'management' && (jabatan === 'SM' || jabatan === 'Senior Manager')) {
-      // Management sees own docs + docs from their division
-      totalOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 OR sender_division = $2';
-      todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE (sender_name = $1 OR sender_division = $2) AND tgl >= CURRENT_DATE';
-      paramsOut = [displayName, division];
-    } else {
-      // Staff only sees their own docs
-      totalOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1';
-      todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 AND tgl >= CURRENT_DATE';
-      paramsOut = [displayName];
-    }
-
-    if (role === 'top management' || user.is_admin) {
-      totalInQuery = 'SELECT COUNT(*) FROM shared_documents';
-      todayInQuery = 'SELECT COUNT(*) FROM shared_documents WHERE tgl >= CURRENT_DATE';
-      paramsIn = [];
-    } else if (role === 'management' && (jabatan === 'SM' || jabatan === 'Senior Manager')) {
-      let targetDivisions = [division];
-      let subDivs = [];
-      if (division === 'keuangan') subDivs = ['Payment', 'Payroll', 'IT', 'Keuangan', 'Accounting'];
-      else if (division === 'sdm') subDivs = ['SDM', 'GA'];
-      else if (division === 'operasional') subDivs = ['OPS', 'Pengadaan', 'operasional'];
-      else if (division === 'marketing') subDivs = ['marketing'];
-
-      totalInQuery = `
-        SELECT COUNT(DISTINCT d.id) FROM shared_documents d
-        LEFT JOIN users u ON d.user_id = u.id
-        WHERE d.sender_division = $1 OR u.division = $1
-           OR EXISTS (
-             SELECT 1 FROM users u2 WHERE u2.division = $1 AND u2.display_name = ANY(string_to_array(d.penerima, ','))
-           )
-           OR EXISTS (
-             SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($2::text[])
-           )
-      `;
-      todayInQuery = `
-        SELECT COUNT(DISTINCT d.id) FROM shared_documents d
-        LEFT JOIN users u ON d.user_id = u.id
-        WHERE (d.sender_division = $1 OR u.division = $1
-           OR EXISTS (
-             SELECT 1 FROM users u2 WHERE u2.division = $1 AND u2.display_name = ANY(string_to_array(d.penerima, ','))
-           )
-           OR EXISTS (
-             SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($2::text[])
-           )) AND d.tgl >= CURRENT_DATE
-      `;
-      paramsIn = [division, [...subDivs, division]];
-    } else {
-      const userGroups = [displayName];
-      const divisionLabels = {
-        marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional',
-        it: 'IT'
-      };
-      const mappedDiv = divisionLabels[division] || division;
-      const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
-      const userLevel = jabatanHierarchy.indexOf(jabatan);
-
-      if (mappedDiv) {
-        userGroups.push('Divisi ' + mappedDiv);
-        if (jabatan) userGroups.push(jabatan + ' ' + mappedDiv);
-        if (userLevel > 0) {
-          jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
-            userGroups.push(lowerJab + ' ' + mappedDiv);
-          });
-        }
+    if (mappedDiv) {
+      userGroups.push('Divisi ' + mappedDiv);
+      if (jabatan) userGroups.push(jabatan + ' ' + mappedDiv);
+      if (userLevel > 0) {
+        jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
+          userGroups.push(lowerJab + ' ' + mappedDiv);
+        });
       }
-
-      if (jabatan === 'Direktur Umum') userGroups.push('Direktur Umum');
-      else if (jabatan === 'Wakil Direktur' || jabatan === 'Wakil Direktur Utama') { userGroups.push('Wakil Direktur', 'Wakil Direktur Utama'); }
-      else if (jabatan === 'Direktur') userGroups.push('Direktur');
-      else if (jabatan === 'SM' || jabatan === 'Senior Manager') { userGroups.push('Semua SM', 'Semua Senior Manager'); }
-      else if (jabatan === 'Staff') userGroups.push('Semua Staff');
-
-      totalInQuery = `
-        SELECT COUNT(*) FROM shared_documents d
-        WHERE EXISTS (
-          SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($1::text[])
-        )
-      `;
-      todayInQuery = `
-        SELECT COUNT(*) FROM shared_documents d
-        WHERE EXISTS (
-          SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($1::text[])
-        ) AND d.tgl >= CURRENT_DATE
-      `;
-      paramsIn = [userGroups];
     }
 
-    const totalOut = await db.query(totalOutQuery, paramsOut);
-    const todayOut = await db.query(todayOutQuery, paramsOut);
-    const totalIn = await db.query(totalInQuery, paramsIn);
-    const todayIn = await db.query(todayInQuery, paramsIn);
+    if (jabatan === 'Direktur Umum') userGroups.push('Direktur Umum');
+    else if (jabatan === 'Wakil Direktur' || jabatan === 'Wakil Direktur Utama') { userGroups.push('Wakil Direktur', 'Wakil Direktur Utama'); }
+    else if (jabatan === 'Direktur') userGroups.push('Direktur');
+    else if (jabatan === 'SM' || jabatan === 'Senior Manager') { userGroups.push('Semua SM', 'Semua Senior Manager'); }
+    else if (jabatan === 'Staff') userGroups.push('Semua Staff');
+
+    // OUT (keluar): only documents the user themselves sent
+    const totalOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1';
+    const todayOutQuery = 'SELECT COUNT(*) FROM shared_documents WHERE sender_name = $1 AND tgl >= CURRENT_DATE';
+
+    // IN (masuk): only documents explicitly addressed to the user (directly or via group labels), excluding own-sent
+    const totalInQuery = `
+      SELECT COUNT(*) FROM shared_documents d
+      WHERE EXISTS (
+        SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($1::text[])
+      )
+      AND d.sender_name != $2
+    `;
+    const todayInQuery = `
+      SELECT COUNT(*) FROM shared_documents d
+      WHERE EXISTS (
+        SELECT 1 FROM unnest(string_to_array(d.penerima, ',')) rec WHERE rec = ANY($1::text[])
+      )
+      AND d.sender_name != $2
+      AND d.tgl >= CURRENT_DATE
+    `;
+
+    const totalOut = await db.query(totalOutQuery, [displayName]);
+    const todayOut = await db.query(todayOutQuery, [displayName]);
+    const totalIn = await db.query(totalInQuery, [userGroups, displayName]);
+    const todayIn = await db.query(todayInQuery, [userGroups, displayName]);
 
     res.json({
       todayInCount: parseInt(todayIn.rows[0].count, 10),

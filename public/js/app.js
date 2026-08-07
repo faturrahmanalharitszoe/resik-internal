@@ -5365,7 +5365,7 @@ async function handleChangePassword(e) {
       } else {
         document.getElementById('modal-change-pwd-overlay').classList.add('hidden');
         document.getElementById('change-pwd-form').reset();
-        showToast('Password berhasil diubah!', 'success');
+        Swal.fire('Berhasil!', 'Password berhasil diubah.', 'success');
       }
     } else {
       errorEl.textContent = 'Terjadi kesalahan jaringan.';

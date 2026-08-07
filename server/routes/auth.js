@@ -180,7 +180,7 @@ router.put('/change-password', authMiddleware, async (req, res) => {
 
     const valid = await bcrypt.compare(old_password, result.rows[0].password_hash);
     if (!valid) {
-      return res.status(401).json({ error: 'Password lama salah' });
+      return res.status(400).json({ error: 'Password lama salah' });
     }
 
     const password_hash = await bcrypt.hash(new_password, 12);

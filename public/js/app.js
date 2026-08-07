@@ -5362,6 +5362,7 @@ async function handleChangePassword(e) {
     if (res) {
       if (res.error) {
         errorEl.textContent = res.error;
+        Swal.fire('Gagal!', res.error, 'error');
       } else {
         document.getElementById('modal-change-pwd-overlay').classList.add('hidden');
         document.getElementById('change-pwd-form').reset();

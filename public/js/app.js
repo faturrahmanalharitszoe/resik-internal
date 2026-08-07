@@ -4861,7 +4861,7 @@ function renderAdminUsersTable(users) {
   if (users.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align: center; padding: 20px; color: var(--text-muted);">Tidak ada data pengguna.</td>
+        <td colspan="9" style="text-align: center; padding: 20px; color: var(--text-muted);">Tidak ada data pengguna.</td>
       </tr>
     `;
     return;
@@ -4884,6 +4884,10 @@ function renderAdminUsersTable(users) {
     const isSelf = user.id === currentUser.id;
 
     tr.innerHTML = `
+      <td style="padding: 12px 8px; text-align: center;">
+        <input type="checkbox" class="admin-user-checkbox" value="${user.id}" ${isSelf ? 'disabled' : ''}
+          onchange="updateAdminUserSelection()" />
+      </td>
       <td style="padding: 12px 16px; font-weight: 500; color: var(--text-primary);">${esc(toTitleCase(user.display_name))} ${isSelf ? ' <small style="color:var(--accent); font-weight:normal;">(Anda)</small>' : ''}</td>
       <td style="padding: 12px 16px; color: var(--text-secondary);">${esc(user.username)}</td>
       <td style="padding: 12px 16px; color: var(--text-secondary);">${esc(user.email)}</td>
@@ -4912,6 +4916,79 @@ function renderAdminUsersTable(users) {
 // Admin Users Sorting State
 let adminSortField = 'display_name';
 let adminSortDir = 'asc';
+
+// ── Admin Users Bulk Selection ──
+function getSelectedAdminUserIds() {
+  const selected = [];
+  document.querySelectorAll('.admin-user-checkbox:checked').forEach(cb => {
+    selected.push(cb.value);
+  });
+  return selected;
+}
+
+function updateAdminUserSelection() {
+  const bulkBar = $('admin-users-bulk-bar');
+  const bulkCount = $('admin-users-bulk-count');
+  const selectAll = $('admin-users-select-all');
+  if (!bulkBar || !bulkCount) return;
+
+  const selected = getSelectedAdminUserIds();
+  const checkboxes = document.querySelectorAll('.admin-user-checkbox:not(:disabled)');
+  const allChecked = checkboxes.length > 0 && selected.length === checkboxes.length;
+  if (selectAll) selectAll.checked = allChecked;
+
+  if (selected.length > 0) {
+    bulkBar.classList.add('active');
+    bulkCount.textContent = selected.length + ' dipilih';
+  } else {
+    bulkBar.classList.remove('active');
+    bulkCount.textContent = '0 dipilih';
+  }
+}
+window.updateAdminUserSelection = updateAdminUserSelection;
+
+function toggleAdminUserSelectAll(checkbox) {
+  document.querySelectorAll('.admin-user-checkbox').forEach(cb => {
+    if (!cb.disabled) cb.checked = checkbox.checked;
+  });
+  updateAdminUserSelection();
+}
+window.toggleAdminUserSelectAll = toggleAdminUserSelectAll;
+
+function clearAdminUserSelection() {
+  document.querySelectorAll('.admin-user-checkbox').forEach(cb => cb.checked = false);
+  const selectAll = $('admin-users-select-all');
+  if (selectAll) selectAll.checked = false;
+  updateAdminUserSelection();
+}
+window.clearAdminUserSelection = clearAdminUserSelection;
+
+async function bulkDeleteAdminUsers() {
+  const ids = getSelectedAdminUserIds();
+  if (ids.length === 0) return;
+
+  const confirmed = await showCustomConfirm(`Hapus ${ids.length} pengguna secara permanen?`);
+  if (!confirmed) return;
+
+  const res = await apiFetch('/api/admin/users/bulk-delete', {
+    method: 'POST',
+    body: { ids }
+  });
+
+  if (res) {
+    if (res.error) {
+      Swal.fire('Gagal!', res.error, 'error');
+    } else {
+      const skipped = res.skippedSelf ? ' Akun Anda sendiri dilewati.' : '';
+      Swal.fire('Berhasil!', `${res.message}.${skipped}`, 'success');
+      clearAdminUserSelection();
+      await loadAdminUsers();
+    }
+  } else {
+    Swal.fire('Gagal!', 'Terjadi kesalahan jaringan.', 'error');
+  }
+}
+window.bulkDeleteAdminUsers = bulkDeleteAdminUsers;
 
 function sortAdminUsers(field) {
   if (adminSortField === field) {

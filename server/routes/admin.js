@@ -183,6 +183,40 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+// POST /api/admin/users/bulk-delete - Delete multiple users
+router.post('/users/bulk-delete', async (req, res) => {
+  const { ids } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Tidak ada pengguna yang dipilih' });
+  }
+
+  const cleanIds = [...new Set(ids.map(id => String(id)))];
+  const selfIncluded = cleanIds.includes(String(req.user.id));
+
+  const deletableIds = cleanIds.filter(id => id !== String(req.user.id));
+
+  if (deletableIds.length === 0) {
+    return res.status(400).json({ error: 'Anda tidak dapat menghapus akun Anda sendiri' });
+  }
+
+  try {
+    const placeholders = deletableIds.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await db.query(
+      `DELETE FROM users WHERE id IN (${placeholders}) RETURNING id`,
+      deletableIds
+    );
+    res.json({
+      message: `${result.rows.length} pengguna berhasil dihapus`,
+      deletedCount: result.rows.length,
+      skippedSelf: selfIncluded
+    });
+  } catch (err) {
+    console.error('Admin bulk delete users error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // --- DIVISIONS MANAGEMENT ---
 
 router.get('/divisions', async (req, res) => {

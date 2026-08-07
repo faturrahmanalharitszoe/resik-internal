@@ -678,12 +678,23 @@
               </div>
               <button class="btn-primary-sm" onclick="openAdminAddUserModal()">+ Tambah User</button>
             </div>
+            <div id="admin-users-bulk-bar" class="sf-bulk-bar">
+              <span class="sf-bulk-count" id="admin-users-bulk-count">0 dipilih</span>
+              <div style="display: flex; gap: 8px; margin-left: auto;">
+                <button class="btn-bulk-action" style="color: var(--danger);" onclick="bulkDeleteAdminUsers()"
+                  title="Hapus yang dipilih">🗑️ Hapus</button>
+                <button class="btn-bulk-action" onclick="clearAdminUserSelection()">✕ Batal</button>
+              </div>
+            </div>
             <div class="table-wrapper"
               style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;">
               <table class="sharing-table"
                 style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
                 <thead>
                   <tr style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, 0.02);">
+                    <th style="padding: 12px 8px; width: 36px; text-align: center;">
+                      <input type="checkbox" id="admin-users-select-all" onclick="toggleAdminUserSelectAll(this)" />
+                    </th>
                     <th class="sortable" onclick="sortAdminUsers('display_name')"
                       style="padding: 12px 16px; font-weight: 600; color: var(--text-secondary); cursor: pointer;">Nama
                       Lengkap <span class="sort-indicator" id="sort-ind-admin-display_name"></span></th>

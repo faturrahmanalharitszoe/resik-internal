@@ -4098,6 +4098,7 @@ html[data-theme="dark"] .btn-cover-action:hover {
 .app.sidebar-collapsed .activity-icon-btn {
   width: 100%;
   justify-content: flex-start;
+  gap: 10px;
   padding: 10px 12px;
 }
 

@@ -5356,15 +5356,19 @@ async function handleChangePassword(e) {
   try {
     const res = await apiFetch('/api/auth/change-password', {
       method: 'PUT',
-      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+      body: { old_password: oldPwd, new_password: newPwd }
     });
-    if (res.ok) {
-      document.getElementById('modal-change-pwd-overlay').classList.add('hidden');
-      document.getElementById('change-pwd-form').reset();
-      showToast('Password berhasil diubah!', 'success');
+
+    if (res) {
+      if (res.error) {
+        errorEl.textContent = res.error;
+      } else {
+        document.getElementById('modal-change-pwd-overlay').classList.add('hidden');
+        document.getElementById('change-pwd-form').reset();
+        showToast('Password berhasil diubah!', 'success');
+      }
     } else {
-      const data = await res.json();
-      errorEl.textContent = data.error || 'Gagal mengubah password.';
+      errorEl.textContent = 'Terjadi kesalahan jaringan.';
     }
   } catch (err) {
     errorEl.textContent = 'Terjadi kesalahan jaringan.';

@@ -566,7 +566,7 @@ function connectSocket() {
       appendMessage(msg);
       scrollToBottom();
     } else {
-      // Unread counting is handled by new_persistent_notification to avoid double counts.
+      chatUnreadCounts[msg.room_id] = (chatUnreadCounts[msg.room_id] || 0) + 1;
       updateChatTabBadge();
     }
     updateRoomPreview(msg.room_id, msg.content, msg.created_at);
@@ -590,14 +590,11 @@ function connectSocket() {
     }
 
     if (notif.type === 'chat') {
-      // Chat notification: only mark unread if not currently viewing that room
+      // Unread count already handled by new_message; here only update bell dropdown & browser push.
       if (notif.room_id !== currentRoomId) {
-        chatUnreadCounts[notif.room_id] = (chatUnreadCounts[notif.room_id] || 0) + 1;
-        updateChatTabBadge();
         renderRooms();
         renderUsers();
       }
-      // Also play a subtle sound? (skip) — just update bell dropdown below
     } else {
       showCustomAlert(`Dokumen Baru: ${notif.document_name} telah dibagikan ke divisi Anda.`);
     }

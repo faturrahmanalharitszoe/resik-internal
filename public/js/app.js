@@ -566,10 +566,10 @@ function connectSocket() {
       appendMessage(msg);
       scrollToBottom();
     } else {
-      chatUnreadCounts[msg.room_id] = (chatUnreadCounts[msg.room_id] || 0) + 1;
+      // Unread counting is handled by new_persistent_notification to avoid double counts.
       updateChatTabBadge();
     }
-    updateRoomPreview(msg.room_id, msg.content);
+    updateRoomPreview(msg.room_id, msg.content, msg.created_at);
     renderRooms();
     renderUsers();
   });
@@ -916,13 +916,16 @@ async function openRoom(room) {
   messageInput.focus();
 }
 
-function updateRoomPreview(roomId, content) {
+function updateRoomPreview(roomId, content, createdAt) {
   const item = document.querySelector(`.room-item[data-room-id="${roomId}"] .room-preview`);
   if (item) item.textContent = content;
 
   const room = rooms.find(r => r.id === roomId);
   if (room) {
     room.last_message = content;
+    if (createdAt) {
+      room.last_message_at = createdAt;
+    }
     if (room.type === 'dm') {
       const userItem = document.querySelector(`.room-item[data-user-id="${room.dm_user_id}"] .room-preview`);
       if (userItem) {

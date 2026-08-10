@@ -17,6 +17,7 @@ let rooms = [];
 let systemUsers = [];
 let typingTimer = null;
 let currentView = 'chat';
+let chatUnreadCounts = {}; // room_id -> unread count
 let currentNotionPageId = null;
 let currentNotionPage = null;
 
@@ -433,7 +434,6 @@ function switchSidebarTab(tabName, autoExpand = true) {
     }
   } else if (tabName === 'chat' && currentView !== 'chat') {
     switchView('chat');
-    clearChatTabBadge();
   } else if (tabName === 'admin' && currentView !== 'admin') {
     switchView('admin');
   }
@@ -565,8 +565,13 @@ function connectSocket() {
     if (msg.room_id === currentRoomId) {
       appendMessage(msg);
       scrollToBottom();
+    } else {
+      chatUnreadCounts[msg.room_id] = (chatUnreadCounts[msg.room_id] || 0) + 1;
+      updateChatTabBadge();
     }
     updateRoomPreview(msg.room_id, msg.content);
+    renderRooms();
+    renderUsers();
   });
 
   socket.on('user_typing', ({ user_id, display_name, is_typing, room_id }) => {
@@ -585,14 +590,12 @@ function connectSocket() {
     }
 
     if (notif.type === 'chat') {
-      // Chat notification: only show badge if not currently viewing that room
+      // Chat notification: only mark unread if not currently viewing that room
       if (notif.room_id !== currentRoomId) {
-        const chatBadge = $('chat-tab-badge');
-        if (chatBadge) {
-          let count = parseInt(chatBadge.textContent) || 0;
-          chatBadge.textContent = count + 1;
-          chatBadge.classList.remove('hidden');
-        }
+        chatUnreadCounts[notif.room_id] = (chatUnreadCounts[notif.room_id] || 0) + 1;
+        updateChatTabBadge();
+        renderRooms();
+        renderUsers();
       }
       // Also play a subtle sound? (skip) — just update bell dropdown below
     } else {
@@ -713,15 +716,20 @@ function renderRooms() {
   const roomListEl = $('room-list');
   if (!roomListEl) return;
   roomListEl.innerHTML = '';
-  const groupRooms = rooms.filter(r => r.type === 'group');
+  const groupRooms = rooms.filter(r => r.type === 'group')
+    .sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0));
   groupRooms.forEach((room) => {
     const li = document.createElement('li');
     li.className = 'room-item' + (room.id === currentRoomId ? ' active' : '');
     li.dataset.roomId = room.id;
+    const unreadCount = chatUnreadCounts[room.id] || 0;
+    const unreadBadge = unreadCount > 0
+      ? `<span class="unread-badge-sm">${unreadCount > 99 ? '99+' : unreadCount}</span>`
+      : '';
     li.innerHTML = `
       <span class="room-hash">#</span>
       <div class="room-info">
-        <div class="room-name">${esc(room.name)}</div>
+        <div class="room-name" style="display: flex; align-items: center; gap: 6px;">${esc(room.name)}${unreadBadge}</div>
         <div class="room-preview">${esc(room.last_message || 'Belum ada pesan')}</div>
       </div>
     `;
@@ -742,7 +750,32 @@ function renderUsers() {
   if (!userList) return;
   userList.innerHTML = '';
 
-  systemUsers.forEach((user) => {
+  const searchVal = ($('user-search-input') ? $('user-search-input').value : '').toLowerCase().trim();
+
+  // Sort: users with DM chats (by last_message_at desc) first, then by name
+  const sorted = [...systemUsers].sort((a, b) => {
+    const roomA = rooms.find(r => r.type === 'dm' && r.dm_user_id === a.id);
+    const roomB = rooms.find(r => r.type === 'dm' && r.dm_user_id === b.id);
+    const ta = roomA ? new Date(roomA.last_message_at || 0).getTime() : 0;
+    const tb = roomB ? new Date(roomB.last_message_at || 0).getTime() : 0;
+    if (ta !== tb) return tb - ta;
+    return (a.display_name || '').localeCompare(b.display_name || '');
+  });
+
+  const divisionLabels = {
+    marketing: 'Marketing',
+    sdm: 'SDM',
+    keuangan: 'Keuangan',
+    operasional: 'Operasional',
+    it: 'IT'
+  };
+
+  sorted.forEach((user) => {
+    if (searchVal) {
+      const haystack = ((user.display_name || '') + ' ' + (user.username || '') + ' ' + (user.division || '')).toLowerCase();
+      if (!haystack.includes(searchVal)) return;
+    }
+
     const currentRoom = rooms.find(r => r.id === currentRoomId);
     const isActive = currentRoom && currentRoom.type === 'dm' && currentRoom.dm_user_id === user.id;
 
@@ -750,16 +783,7 @@ function renderUsers() {
     li.className = 'room-item' + (isActive ? ' active' : '');
     li.dataset.userId = user.id;
 
-    const divisionLabels = {
-      marketing: 'Marketing',
-      sdm: 'SDM',
-      keuangan: 'Keuangan',
-      operasional: 'Operasional',
-      it: 'IT',
-      it: 'IT'
-    };
-
-    const divLabel = divisionLabels[user.division] || '';
+    const divLabel = divisionLabels[(user.division || '').toLowerCase()] || user.division || '';
     const statusDot = user.is_online
       ? '<span class="status-dot online"></span>'
       : '<span class="status-dot offline"></span>';
@@ -767,6 +791,11 @@ function renderUsers() {
     const dmRoom = rooms.find(r => r.type === 'dm' && r.dm_user_id === user.id);
     const hasChat = dmRoom && dmRoom.last_message;
     const subText = hasChat ? dmRoom.last_message : (user.jabatan || user.role || '');
+
+    const unreadCount = dmRoom ? (chatUnreadCounts[dmRoom.id] || 0) : 0;
+    const unreadBadge = unreadCount > 0
+      ? `<span class="unread-badge-sm">${unreadCount > 99 ? '99+' : unreadCount}</span>`
+      : '';
 
     li.innerHTML = `
       <div class="user-avatar-container">
@@ -776,6 +805,7 @@ function renderUsers() {
       <div class="room-info" style="margin-left: 8px; min-width: 0; flex: 1;">
         <div class="room-name-container" style="display: flex; align-items: center;">
           <span class="room-name" style="font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;" title="${esc(toTitleCase(user.display_name))}">${esc(toTitleCase(user.display_name))}</span>
+          ${unreadBadge}
         </div>
         <div class="room-preview-row" style="display: flex; align-items: center; gap: 6px; margin-top: 2px; min-width: 0;">
           ${divLabel ? `<span class="division-badge ${user.division || ''}" style="font-size: 9px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; line-height: 1.2;" title="Divisi: ${esc(divLabel)}">${esc(divLabel)}</span>` : ''}
@@ -809,9 +839,12 @@ async function startDM(targetUserId) {
 async function openRoom(room) {
   switchView('chat');
   currentRoomId = room.id;
-  clearChatTabBadge();
+  delete chatUnreadCounts[room.id];
+  updateChatTabBadge();
   if (socket) socket.emit('view_room', { room_id: room.id });
   markRoomNotificationsRead(room.id);
+  renderRooms();
+  renderUsers();
 
   // Update active state in Rooms list
   document.querySelectorAll('.room-item').forEach((el) => {
@@ -1093,6 +1126,10 @@ async function showApp() {
   connectSocket();
   await loadRooms();
   await loadUsers();
+  const userSearchInput = $('user-search-input');
+  if (userSearchInput) {
+    userSearchInput.addEventListener('input', renderUsers);
+  }
   initSharingEvents();
   await loadNotionWorkspace();
   await loadNotifications();
@@ -5632,12 +5669,23 @@ async function markRoomNotificationsRead(roomId) {
   }
 }
 
-function clearChatTabBadge() {
+function updateChatTabBadge() {
   const chatBadge = $('chat-tab-badge');
-  if (chatBadge) {
+  if (!chatBadge) return;
+  const total = Object.values(chatUnreadCounts).reduce((a, b) => a + b, 0);
+  if (total > 0) {
+    chatBadge.textContent = total > 99 ? '99+' : String(total);
+    chatBadge.classList.remove('hidden');
+  } else {
     chatBadge.textContent = '0';
     chatBadge.classList.add('hidden');
   }
+}
+window.updateChatTabBadge = updateChatTabBadge;
+
+function clearChatTabBadge() {
+  chatUnreadCounts = {};
+  updateChatTabBadge();
 }
 window.clearChatTabBadge = clearChatTabBadge;
 
@@ -5649,6 +5697,17 @@ async function loadNotifications() {
   try {
     const notifs = await apiFetch('/api/notifications');
     if (!notifs) return;
+
+    // Seed chat unread counts from chat notifications
+    chatUnreadCounts = {};
+    notifs.forEach(notif => {
+      if (notif.room_id) {
+        chatUnreadCounts[notif.room_id] = (chatUnreadCounts[notif.room_id] || 0) + 1;
+      }
+    });
+    updateChatTabBadge();
+    renderRooms();
+    renderUsers();
 
     if (notifs.length > 0) {
       badge.textContent = notifs.length;

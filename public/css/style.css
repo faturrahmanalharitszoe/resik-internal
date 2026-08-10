@@ -555,6 +555,41 @@ body {
   overflow-y: auto;
 }
 
+.users-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+
+.users-search-wrap input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.users-search-wrap input:focus {
+  border-color: var(--accent);
+}
+
+.unread-badge-sm {
+  background: #ef4444;
+  color: #fff;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .sidebar-section.border-top {
   border-top: 1px solid var(--border);
 }

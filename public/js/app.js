@@ -1313,7 +1313,7 @@ function initSharingEvents() {
 function initSharingFolder() {
   renderSharingTabs();
 
-  const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin');
+  const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator');
 
   // Set default active tab based on role
   document.querySelectorAll('.sf-tab, .sharing-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -1347,7 +1347,7 @@ function renderSharingTabs() {
   tabDivisi.classList.add('hidden');
   tabSemua.classList.add('hidden');
 
-  const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin');
+  const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator');
 
   if (currentUser.role === 'management') {
     tabDivisi.classList.remove('hidden');
@@ -1476,7 +1476,7 @@ function renderPenerimaWidget(container) {
 
   const jabatanList = [...new Set(
     allUsers.map(u => u.jabatan).filter(Boolean)
-  )].sort();
+  )].filter(j => !/administrator/i.test(j)).sort();
 
   // Build the penerima widget HTML structure
   let html = '<div class="penerima-wrapper">';
@@ -1594,7 +1594,7 @@ function getDisplayRecipients(penerimaStr) {
 
   // Derive division and jabatan values from recipientsList for dynamic matching
   const knownDivisions = [...new Set(recipientsList.map(u => u.divisi).filter(Boolean))];
-  const knownJabatan = [...new Set(recipientsList.map(u => u.jabatan).filter(Boolean))];
+  const knownJabatan = [...new Set(recipientsList.map(u => u.jabatan).filter(Boolean))].filter(j => !/administrator/i.test(j));
 
   const isGroupLabel = (str) => {
     // New format: "Divisi X", "Jabatan X", "JabatanName DivisionName"
@@ -1670,7 +1670,7 @@ function renderDocumentsTable() {
       }
     } else if (activeTab === 'masuk') {
       // Admin sees all documents (same as "semua" tab)
-      const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin');
+      const isAdmin = currentUser && (currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator');
       if (!isAdmin) {
         const senderLower = (doc.senderName || '').toLowerCase().trim();
         const currentNameLower = (currentUser.display_name || '').toLowerCase().trim();
@@ -1817,7 +1817,7 @@ function renderDocumentsTable() {
 
     const isDocSelected = selectedDocIds.has(doc.id);
     const canEdit = (doc.senderName || '').toLowerCase().trim() === (currentUser.display_name || '').toLowerCase().trim();
-    const canDelete = currentUser.is_admin || currentUser.username === 'admin';
+    const canDelete = currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator';
     const editBtn = canEdit
       ? `<button class="btn-action edit-btn" onclick="event.stopPropagation(); openEditModal('${doc.id}')">
            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>

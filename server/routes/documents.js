@@ -747,7 +747,7 @@ router.delete('/:id', async (req, res) => {
     const doc = docResult.rows[0];
 
     // Only owner, top management, or admin can delete
-    if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin && user.username !== 'admin' && user.username !== 'administrator') {
+    if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin && user.username !== 'admin') {
       return res.status(403).json({ error: 'Anda tidak memiliki hak untuk menghapus dokumen ini' });
     }
 
@@ -783,7 +783,7 @@ router.post('/bulk_delete', async (req, res) => {
       const doc = docResult.rows[0];
 
       // Only owner, top management, or admin can delete
-      if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin && user.username !== 'admin' && user.username !== 'administrator') {
+      if (doc.user_id !== user.id && user.role !== 'top management' && !user.is_admin && user.username !== 'admin') {
         continue;
       }
 

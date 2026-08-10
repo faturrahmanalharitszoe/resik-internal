@@ -433,6 +433,7 @@ function switchSidebarTab(tabName, autoExpand = true) {
     }
   } else if (tabName === 'chat' && currentView !== 'chat') {
     switchView('chat');
+    clearChatTabBadge();
   } else if (tabName === 'admin' && currentView !== 'admin') {
     switchView('admin');
   }
@@ -582,7 +583,21 @@ function connectSocket() {
       badge.textContent = count + 1;
       badge.classList.remove('hidden');
     }
-    showCustomAlert(`Dokumen Baru: ${notif.document_name} telah dibagikan ke divisi Anda.`);
+
+    if (notif.type === 'chat') {
+      // Chat notification: only show badge if not currently viewing that room
+      if (notif.room_id !== currentRoomId) {
+        const chatBadge = $('chat-tab-badge');
+        if (chatBadge) {
+          let count = parseInt(chatBadge.textContent) || 0;
+          chatBadge.textContent = count + 1;
+          chatBadge.classList.remove('hidden');
+        }
+      }
+      // Also play a subtle sound? (skip) — just update bell dropdown below
+    } else {
+      showCustomAlert(`Dokumen Baru: ${notif.document_name} telah dibagikan ke divisi Anda.`);
+    }
 
     // Update Dropdown List
     const listContainer = $('notification-list');
@@ -593,8 +608,9 @@ function connectSocket() {
       }
 
       const time = new Date(notif.created_at || new Date()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const roomAttr = notif.room_id ? ` data-room-id="${notif.room_id}"` : '';
       const itemHtml = `
-        <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
+        <div id="notif-item-${notif.id}"${roomAttr} style="padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
           <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${esc(notif.message)}</div>
           <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
             <span>Dari: ${esc(notif.sender_name || 'Sistem')}</span>
@@ -793,6 +809,9 @@ async function startDM(targetUserId) {
 async function openRoom(room) {
   switchView('chat');
   currentRoomId = room.id;
+  clearChatTabBadge();
+  if (socket) socket.emit('view_room', { room_id: room.id });
+  markRoomNotificationsRead(room.id);
 
   // Update active state in Rooms list
   document.querySelectorAll('.room-item').forEach((el) => {
@@ -1637,10 +1656,9 @@ function renderDocumentsTable() {
     sdm: 'SDM',
     keuangan: 'Keuangan',
     operasional: 'Operasional',
-    it: 'IT',
     it: 'IT'
   };
-  const divLabel = divisionLabels[currentUser.division] || '';
+  const divLabel = divisionLabels[(currentUser.division || '').toLowerCase()] || currentUser.division || '';
 
   const filtered = sharedDocuments.filter(doc => {
     // 1. Tab Filter
@@ -1679,7 +1697,7 @@ function renderDocumentsTable() {
 
         // Build the full list of group labels the current user belongs to
         const userGroups = [currentUser.display_name];
-        const mappedDiv = divisionLabels[currentUser.division] || '';
+        const mappedDiv = divisionLabels[(currentUser.division || '').toLowerCase()] || currentUser.division || '';
         if (mappedDiv) {
           userGroups.push('Divisi ' + mappedDiv);
           const jbt = currentUser.jabatan || 'Staff';
@@ -5602,6 +5620,27 @@ async function registerAndSubscribePush() {
 }
 
 /* --- Persistent Notifications Logic --- */
+async function markRoomNotificationsRead(roomId) {
+  try {
+    await fetch(`/api/notifications/room/${roomId}/read`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    loadNotifications();
+  } catch (err) {
+    console.error('Failed to mark room notifications read', err);
+  }
+}
+
+function clearChatTabBadge() {
+  const chatBadge = $('chat-tab-badge');
+  if (chatBadge) {
+    chatBadge.textContent = '0';
+    chatBadge.classList.add('hidden');
+  }
+}
+window.clearChatTabBadge = clearChatTabBadge;
+
 async function loadNotifications() {
   const badge = $('notification-badge');
   const listContainer = $('notification-list');
@@ -5618,8 +5657,9 @@ async function loadNotifications() {
       let html = '';
       notifs.forEach(notif => {
         const time = new Date(notif.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const roomAttr = notif.room_id ? ` data-room-id="${notif.room_id}"` : '';
         html += `
-          <div id="notif-item-${notif.id}" style="padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
+          <div id="notif-item-${notif.id}"${roomAttr} style="padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'" onclick="markNotificationAsRead('${notif.id}')">
             <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${esc(notif.message)}</div>
             <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
               <span>Dari: ${esc(notif.sender_name || 'Sistem')}</span>
@@ -5640,7 +5680,14 @@ async function loadNotifications() {
 }
 
 async function markNotificationAsRead(id) {
+  let notifRoomId = null;
   try {
+    // Capture room id BEFORE removing from DOM
+    const el0 = $(`notif-item-${id}`);
+    if (el0) {
+      notifRoomId = el0.getAttribute('data-room-id');
+    }
+
     await fetch(`/api/notifications/${id}/read`, {
       method: 'PUT',
       headers: { 'Authorization': `Bearer ${token}` }
@@ -5671,6 +5718,15 @@ async function markNotificationAsRead(id) {
     // Close dropdown & navigate
     const dropdown = $('notification-dropdown');
     if (dropdown) dropdown.classList.add('hidden');
+
+    // If it's a chat notification, navigate to the room
+    if (notifRoomId) {
+      const room = rooms.find(r => r.id === notifRoomId);
+      if (room) {
+        openRoom(room);
+        return;
+      }
+    }
     loadSharedDocuments();
     switchView('sharing');
 

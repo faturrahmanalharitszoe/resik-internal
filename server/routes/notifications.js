@@ -44,8 +44,7 @@ router.get('/', authMiddleware, async (req, res) => {
       LEFT JOIN shared_documents d ON n.document_id = d.id
       WHERE n.user_id = $1 AND n.is_read = FALSE
       ORDER BY n.created_at DESC
-    `, [req.user.id]);
-    res.json(result.rows);
+    `, [req.user.id]);    res.json(result.rows);
   } catch (err) {
     console.error('Error fetching notifications:', err);
     res.status(500).json({ error: 'Database error' });
@@ -60,6 +59,18 @@ router.put('/:id/read', authMiddleware, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Error marking notification as read:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PUT /api/notifications/room/:roomId/read
+router.put('/room/:roomId/read', authMiddleware, async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    await pool.query('UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND room_id = $2', [req.user.id, roomId]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking room notifications as read:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });

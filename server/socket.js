@@ -1,4 +1,5 @@
 const db = require('./db');
+const webpush = require('./webpush');
 
 function stripHtmlTags(str) {
   if (!str) return '';
@@ -7,6 +8,7 @@ function stripHtmlTags(str) {
 
 module.exports = function setupSocket(io) {
   const typingTimestamps = new Map();
+  const userActiveRoom = new Map(); // userId -> room_id currently viewed
 
   io.on('connection', (socket) => {
     const user = socket.user;
@@ -40,6 +42,15 @@ module.exports = function setupSocket(io) {
     // Join specific room dynamically
     socket.on('join_room', ({ room_id }) => {
       socket.join(room_id);
+    });
+
+    // Track which room the user is currently viewing (for notifications)
+    socket.on('view_room', ({ room_id }) => {
+      userActiveRoom.set(user.id, room_id);
+    });
+
+    socket.on('leave_view', () => {
+      userActiveRoom.delete(user.id);
     });
 
     // Send message
@@ -86,6 +97,76 @@ module.exports = function setupSocket(io) {
         // Broadcast to everyone in the room (including sender)
         io.to(room_id).emit('new_message', message);
         callback?.({ success: true, message });
+
+        // Create notifications for other room members + web push (like sharing folder)
+        (async () => {
+          try {
+            const membersRes = await db.query(
+              'SELECT user_id FROM room_members WHERE room_id = $1 AND user_id != $2',
+              [room_id, user.id]
+            );
+            // Exclude members who are currently viewing this room (no notification needed)
+            const memberIds = membersRes.rows
+              .map(r => r.user_id)
+              .filter(uid => userActiveRoom.get(uid) !== room_id);
+            if (memberIds.length === 0) return;
+
+            const preview = finalContent
+              ? (finalContent.length > 80 ? finalContent.substring(0, 80) + '...' : finalContent)
+              : 'Mengirim file';
+            const notifMsg = `${user.display_name}: ${preview}`;
+
+            const insertedNotifs = [];
+            for (const uid of memberIds) {
+              const notifRes = await db.query(
+                `INSERT INTO notifications (user_id, sender_id, message, room_id)
+                 VALUES ($1, $2, $3, $4) RETURNING *`,
+                [uid, user.id, notifMsg, room_id]
+              );
+              insertedNotifs.push(notifRes.rows[0]);
+            }
+
+            const ioInstance = io;
+            insertedNotifs.forEach(notif => {
+              ioInstance.to(`user_${notif.user_id}`).emit('new_persistent_notification', {
+                ...notif,
+                sender_name: user.display_name,
+                type: 'chat',
+                room_id,
+                message: notifMsg
+              });
+            });
+
+            // Fetch push subscriptions
+            const placeholders = memberIds.map((_, i) => '$' + (i + 1)).join(',');
+            const subsRes = await db.query(
+              `SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})`,
+              memberIds
+            );
+
+            const payload = JSON.stringify({
+              title: 'Pesan Baru',
+              body: notifMsg,
+              url: '/'
+            });
+
+            for (const sub of subsRes.rows) {
+              const pushSub = {
+                endpoint: sub.endpoint,
+                keys: { p256dh: sub.p256dh, auth: sub.auth }
+              };
+              webpush.sendNotification(pushSub, payload).catch(err => {
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                  db.query("DELETE FROM push_subscriptions WHERE endpoint = $1", [sub.endpoint]).catch(console.error);
+                } else {
+                  console.error('Push notification error:', err);
+                }
+              });
+            }
+          } catch (err) {
+            console.error('Failed to create chat notifications:', err);
+          }
+        })();
       } catch (err) {
         console.error('send_message error:', err);
         callback?.({ error: 'Gagal mengirim pesan' });
@@ -148,6 +229,8 @@ module.exports = function setupSocket(io) {
           typingTimestamps.delete(key);
         }
       }
+
+      userActiveRoom.delete(user.id);
 
       await db.query(
         'UPDATE users SET is_online = false, last_seen = NOW() WHERE id = $1',

@@ -351,6 +351,11 @@ async function runMigrations() {
       );
     `);
 
+    // Add room_id column for chat notifications if it doesn't exist
+    await pool.query(`
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS room_id UUID;
+    `);
+
     console.log('✅ Migrasi database selesai.');
   } catch (err) {
     console.error('❌ Gagal menjalankan migrasi database:', err);

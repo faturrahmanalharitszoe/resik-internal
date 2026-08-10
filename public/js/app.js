@@ -565,6 +565,7 @@ function connectSocket() {
     if (msg.room_id === currentRoomId) {
       appendMessage(msg);
       scrollToBottom();
+      if (socket) socket.emit('view_room', { room_id: msg.room_id });
     } else {
       chatUnreadCounts[msg.room_id] = (chatUnreadCounts[msg.room_id] || 0) + 1;
       updateChatTabBadge();
@@ -706,6 +707,16 @@ async function loadRooms() {
   const data = await apiFetch('/api/rooms');
   if (!data) return;
   rooms = data;
+
+  // Seed unread counts from server-computed per-room counts (survives refresh/re-login)
+  chatUnreadCounts = {};
+  rooms.forEach(room => {
+    if (room.unread_count > 0) {
+      chatUnreadCounts[room.id] = room.unread_count;
+    }
+  });
+  updateChatTabBadge();
+
   renderRooms();
 }
 
@@ -5698,14 +5709,6 @@ async function loadNotifications() {
     const notifs = await apiFetch('/api/notifications');
     if (!notifs) return;
 
-    // Seed chat unread counts from chat notifications
-    chatUnreadCounts = {};
-    notifs.forEach(notif => {
-      if (notif.room_id) {
-        chatUnreadCounts[notif.room_id] = (chatUnreadCounts[notif.room_id] || 0) + 1;
-      }
-    });
-    updateChatTabBadge();
     renderRooms();
     renderUsers();
 

@@ -356,6 +356,11 @@ async function runMigrations() {
       ALTER TABLE notifications ADD COLUMN IF NOT EXISTS room_id UUID;
     `);
 
+    // Add last_read_at column to room_members for unread tracking
+    await pool.query(`
+      ALTER TABLE room_members ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMP WITH TIME ZONE;
+    `);
+
     console.log('✅ Migrasi database selesai.');
   } catch (err) {
     console.error('❌ Gagal menjalankan migrasi database:', err);

@@ -15,6 +15,9 @@ router.get('/', async (req, res) => {
         (SELECT created_at FROM messages WHERE room_id = r.id AND is_deleted = false
          ORDER BY created_at DESC LIMIT 1) as last_message_at,
         (SELECT COUNT(*) FROM room_members WHERE room_id = r.id)::int as member_count,
+        (SELECT COUNT(*) FROM messages m2
+         WHERE m2.room_id = r.id AND m2.is_deleted = false AND m2.sender_id != $1
+           AND m2.created_at > COALESCE(rm.last_read_at, rm.joined_at))::int as unread_count,
         u.id as dm_user_id,
         u.display_name as dm_user_display_name,
         u.username as dm_user_username,
@@ -159,6 +162,12 @@ router.get('/:id/messages', async (req, res) => {
   if (member.rows.length === 0) {
     return res.status(403).json({ error: 'Akses ditolak' });
   }
+
+  // Mark room as read on fetch
+  await db.query(
+    'UPDATE room_members SET last_read_at = NOW() WHERE room_id = $1 AND user_id = $2',
+    [id, req.user.id]
+  );
 
   try {
     let query = `

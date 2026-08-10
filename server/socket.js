@@ -47,6 +47,10 @@ module.exports = function setupSocket(io) {
     // Track which room the user is currently viewing (for notifications)
     socket.on('view_room', ({ room_id }) => {
       userActiveRoom.set(user.id, room_id);
+      db.query(
+        'UPDATE room_members SET last_read_at = NOW() WHERE room_id = $1 AND user_id = $2',
+        [room_id, user.id]
+      ).catch(console.error);
     });
 
     socket.on('leave_view', () => {

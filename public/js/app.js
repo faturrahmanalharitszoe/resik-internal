@@ -705,7 +705,10 @@ function connectSocket() {
 /* ─── ROOMS ─── */
 async function loadRooms() {
   const data = await apiFetch('/api/rooms');
-  if (!data) return;
+  if (!data || !Array.isArray(data)) {
+    console.error('loadRooms: respons bukan array', data);
+    return;
+  }
   rooms = data;
 
   // Seed unread counts from server-computed per-room counts (survives refresh/re-login)

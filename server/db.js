@@ -24,14 +24,19 @@ async function runMigrations() {
       ADD COLUMN IF NOT EXISTS division VARCHAR(50);
     `);
 
-    // Drop and re-add division constraint to ensure 'it' is included
+    // Drop and re-add division constraint to ensure 'it' is included.
+    // Wrapped in try/catch so legacy/invalid division values don't abort later migrations.
     await pool.query(`
       ALTER TABLE users DROP CONSTRAINT IF EXISTS users_division_check;
     `);
-    await pool.query(`
-      ALTER TABLE users ADD CONSTRAINT users_division_check
-      CHECK (division IN ('marketing', 'sdm', 'keuangan', 'operasional', 'it'));
-    `);
+    try {
+      await pool.query(`
+        ALTER TABLE users ADD CONSTRAINT users_division_check
+        CHECK (division IN ('marketing', 'sdm', 'keuangan', 'operasional', 'it'));
+      `);
+    } catch (err) {
+      console.warn('⚠️ Skip users_division_check (existing data violates constraint):', err.message);
+    }
 
     // 2. Add role column if it doesn't exist
     await pool.query(`
@@ -43,9 +48,13 @@ async function runMigrations() {
     await pool.query(`
       ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
     `);
-    await pool.query(`
-      ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('staff', 'management', 'top management', 'admin'));
-    `);
+    try {
+      await pool.query(`
+        ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('staff', 'management', 'top management', 'admin'));
+      `);
+    } catch (err) {
+      console.warn('⚠️ Skip users_role_check (existing data violates constraint):', err.message);
+    }
 
     // 2b. Add is_admin column if it doesn't exist
     await pool.query(`
@@ -364,6 +373,15 @@ async function runMigrations() {
     console.log('✅ Migrasi database selesai.');
   } catch (err) {
     console.error('❌ Gagal menjalankan migrasi database:', err);
+  } finally {
+    // Ensure critical chat columns exist regardless of earlier migration failures
+    try {
+      await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS room_id UUID;');
+      await pool.query('ALTER TABLE room_members ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMP WITH TIME ZONE;');
+      console.log('✅ Kolom penting chat dipastikan ada.');
+    } catch (err2) {
+      console.error('❌ Gagal menjalankan migrasi kolom penting:', err2);
+    }
   }
 }
 

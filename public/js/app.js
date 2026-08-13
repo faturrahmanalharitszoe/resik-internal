@@ -2313,10 +2313,18 @@ function resolveRecipientSelections(containerId) {
       if (!resolvedRecipients.includes(groupLabel)) resolvedRecipients.push(groupLabel);
     });
   } else {
-    // Only jabatan — this jabatan across all divisions
+    // Only jabatan — expand to "<jabatan> <divisi>" for every division that has that jabatan,
+    // so recipients actually match users server-side.
     selectedJabatan.forEach(jabName => {
-      const groupLabel = `Jabatan ${jabName}`;
-      if (!resolvedRecipients.includes(groupLabel)) resolvedRecipients.push(groupLabel);
+      const divsWithJab = [...new Set(
+        recipientsList.filter(u => u.jabatan === jabName && u.divisi).map(u => u.divisi)
+      )].sort();
+      divsWithJab.forEach(divName => {
+        const groupLabel = `${jabName} ${divName}`;
+        if (!resolvedRecipients.includes(groupLabel)) {
+          resolvedRecipients.push(groupLabel);
+        }
+      });
     });
   }
 

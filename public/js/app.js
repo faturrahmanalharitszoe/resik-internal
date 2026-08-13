@@ -2273,14 +2273,38 @@ function resolveRecipientSelections(containerId) {
   const resolvedRecipients = [];
 
   if (selectedDivs.length > 0 && selectedJabatan.length > 0) {
-    // Both divisions and jabatan selected — add group labels for each combination
-    selectedDivs.forEach(divName => {
-      selectedJabatan.forEach(jabName => {
-        const groupLabel = `${jabName} ${divName}`;
-        if (!resolvedRecipients.includes(groupLabel)) {
-          resolvedRecipients.push(groupLabel);
+    // Both divisions and jabatan selected: pair each jabatan ONLY with divisions
+    // that actually have users with that jabatan (no invalid cross-product combos).
+    const divSet = new Set(selectedDivs);
+    const jabSetByDiv = new Map();
+    recipientsList.forEach(u => {
+      if (u.jabatan && divSet.has(u.divisi)) {
+        if (!jabSetByDiv.has(u.divisi)) jabSetByDiv.set(u.divisi, new Set());
+        jabSetByDiv.get(u.divisi).add(u.jabatan);
+      }
+    });
+
+    selectedJabatan.forEach(jabName => {
+      selectedDivs.forEach(divName => {
+        const jabSet = jabSetByDiv.get(divName) || new Set();
+        if (jabSet.has(jabName)) {
+          const groupLabel = `${jabName} ${divName}`;
+          if (!resolvedRecipients.includes(groupLabel)) {
+            resolvedRecipients.push(groupLabel);
+          }
         }
       });
+    });
+
+    // Divisions that ended up with no compatible selected jabatan fall back to
+    // the whole-division label so the recipient isn't silently dropped.
+    selectedDivs.forEach(divName => {
+      const jabSet = jabSetByDiv.get(divName) || new Set();
+      const hasMatch = selectedJabatan.some(j => jabSet.has(j));
+      if (!hasMatch) {
+        const groupLabel = `Divisi ${divName}`;
+        if (!resolvedRecipients.includes(groupLabel)) resolvedRecipients.push(groupLabel);
+      }
     });
   } else if (selectedDivs.length > 0) {
     // Only divisions — entire division

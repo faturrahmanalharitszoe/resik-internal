@@ -1536,6 +1536,56 @@ function updatePenerimaCounter(container) {
   }
 }
 
+function filteredJabatanForSelectedDivs(container) {
+  const checkedDivs = [...container.querySelectorAll('input[name="recipients-division"]:checked')]
+    .map(cb => cb.value.trim());
+  const clean = j => j && !/administrator/i.test(j);
+
+  if (checkedDivs.length === 0) {
+    return [...new Set(recipientsList.map(u => u.jabatan).filter(clean))].sort();
+  }
+
+  const set = new Set();
+  checkedDivs.forEach(div => {
+    recipientsList.forEach(u => {
+      if ((u.divisi || '') === div && clean(u.jabatan)) {
+        set.add(u.jabatan);
+      }
+    });
+  });
+  return [...set].sort();
+}
+
+function buildJabatanGroupHtml(container, jabatanList) {
+  const itemsEl = container.querySelector('.penerima-group[data-group="jabatan"] .penerima-items');
+  if (!itemsEl) return;
+  if (jabatanList.length === 0) {
+    itemsEl.innerHTML = '<div class="penerima-empty" style="display:block;">Tidak ada jabatan tersedia untuk divisi terpilih</div>';
+    return;
+  }
+  itemsEl.innerHTML = jabatanList.map(jab => `
+    <label class="recipient-pill">
+      <input type="checkbox" name="recipients-jabatan" value="${esc(jab)}"> ${esc(jab)}
+    </label>
+  `).join('');
+}
+
+function refreshJabatanOptions(container) {
+  buildJabatanGroupHtml(container, filteredJabatanForSelectedDivs(container));
+
+  // Re-apply any active search to the fresh jabatan group
+  const searchInput = container.querySelector('.penerima-search');
+  if (searchInput && searchInput.value) {
+    const q = searchInput.value.toLowerCase().trim();
+    container.querySelectorAll('.penerima-group[data-group="jabatan"] .recipient-pill').forEach(item => {
+      const match = item.textContent.toLowerCase().includes(q);
+      item.style.display = match ? '' : 'none';
+    });
+  }
+
+  updatePenerimaCounter(container);
+}
+
 function renderPenerimaWidget(container) {
   // Derive unique divisions and jabatan from the loaded recipients list
   const allUsers = recipientsList.filter(u => u.username !== currentUser.username);
@@ -1632,6 +1682,20 @@ function renderPenerimaWidget(container) {
       });
       // Update button text
       this.textContent = allChecked ? 'Pilih Semua' : 'Hapus Semua';
+      // Division select-all also re-filters jabatan options
+      if (group.classList.contains('penerima-group') && group.dataset.group === 'divisi') {
+        refreshJabatanOptions(container);
+      }
+      updatePenerimaCounter(container);
+    });
+  });
+
+  // ── When user checks/unchecks a division, scope jabatan options to that division ──
+  container.querySelectorAll('input[name="recipients-division"]').forEach(cb => {
+    cb.addEventListener('change', function () {
+      const pill = this.closest('.recipient-pill');
+      if (pill) pill.classList.toggle('selected', this.checked);
+      refreshJabatanOptions(container);
       updatePenerimaCounter(container);
     });
   });
@@ -2372,6 +2436,7 @@ function openEditModal(docId) {
 
   // Restore division checkboxes: a division is checked if any saved recipient
   // is "Divisi X", "JabatanX X", or "X Y" where X matches the division name
+  let anyDivisionChecked = false;
   container.querySelectorAll('input[name="recipients-division"]').forEach(cb => {
     const divName = cb.value.trim().toLowerCase();
     const isChecked = recs.some(r => {
@@ -2383,8 +2448,14 @@ function openEditModal(docId) {
     if (isChecked) {
       cb.checked = true;
       cb.closest('.recipient-pill')?.classList.add('selected');
+      anyDivisionChecked = true;
     }
   });
+
+  // Scope jabatan options to restored divisions before restoring jabatan checkboxes
+  if (anyDivisionChecked) {
+    refreshJabatanOptions(container);
+  }
 
   // Restore jabatan checkboxes: a jabatan is checked if any saved recipient
   // is "Jabatan X", "X DivName", or matches directly

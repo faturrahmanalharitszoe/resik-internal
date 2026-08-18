@@ -1451,6 +1451,11 @@ function populateDocTypes(selectId, selectedValue = '') {
   const divName = (currentUser.division || '').toLowerCase();
   let options = DOC_TYPES_BY_DIVISION[divName] || DOC_TYPES_BY_DIVISION['default'];
 
+  // User cabang juga melihat tipe dokumen yang tampil di divisi marketing
+  if (divName.includes('cabang') && DOC_TYPES_BY_DIVISION['marketing']) {
+    options = [...options, ...DOC_TYPES_BY_DIVISION['marketing']];
+  }
+
   if (divName && DOC_TYPES_BY_DIVISION['default']) {
     options = [...options, ...DOC_TYPES_BY_DIVISION['default']];
   }

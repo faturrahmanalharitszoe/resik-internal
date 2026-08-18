@@ -108,44 +108,62 @@ function uploadFile(path, headers = {}, fields = {}, fileContent = 'dummy pdf co
 async function runTests() {
   console.log('--- STARTING INTEGRATION TESTS ---');
 
-  // 1. Login as Staff Marketing
-  console.log('Logging in as Staff Marketing...');
-  const loginStaffRes = await request('POST', '/api/auth/login', {}, {
-    username: 'marketing_staff',
-    password: 'password123'
-  });
-  if (loginStaffRes.status !== 200) {
-    throw new Error('Failed to login as marketing_staff: ' + JSON.stringify(loginStaffRes.body));
-  }
-  const staffToken = loginStaffRes.body.token;
-  console.log('Staff Marketing logged in successfully.');
+  const suffix = Math.random().toString(36).substring(2, 8);
 
-  // 2. Login as SM Keuangan
-  console.log('Logging in as SM Keuangan...');
-  const loginSmRes = await request('POST', '/api/auth/login', {}, {
-    username: 'keuangan_sm',
-    password: 'password123'
+  // 1. Register Staff Marketing test user
+  console.log('Registering test Staff Marketing...');
+  const regStaffRes = await request('POST', '/api/auth/register', {}, {
+    username: 'mkt_staff_' + suffix,
+    display_name: 'Staff Marketing Test',
+    email: 'mkt_staff_' + suffix + '@example.com',
+    password: 'password123',
+    division: 'marketing',
+    role: 'staff',
+    jabatan: 'Staff'
   });
-  if (loginSmRes.status !== 200) {
-    throw new Error('Failed to login as keuangan_sm: ' + JSON.stringify(loginSmRes.body));
+  if (regStaffRes.status !== 201) {
+    throw new Error('Failed to register marketing staff: ' + JSON.stringify(regStaffRes.body));
   }
-  const smToken = loginSmRes.body.token;
-  console.log('SM Keuangan logged in successfully.');
+  const staffToken = regStaffRes.body.token;
+  const staffUserId = regStaffRes.body.user.id;
+  console.log('Staff Marketing registered successfully.');
 
-  // 3. Login as Staff Keuangan
-  console.log('Logging in as Staff Keuangan...');
-  const loginStaffKeuRes = await request('POST', '/api/auth/login', {}, {
-    username: 'keuangan_staff',
-    password: 'password123'
+  // 2. Register Manager Keuangan test user (targeted recipient)
+  console.log('Registering test Manager Keuangan...');
+  const regSmRes = await request('POST', '/api/auth/register', {}, {
+    username: 'keu_manager_' + suffix,
+    display_name: 'Manager Keuangan Test',
+    email: 'keu_manager_' + suffix + '@example.com',
+    password: 'password123',
+    division: 'keuangan',
+    role: 'management',
+    jabatan: 'Manager'
   });
-  if (loginStaffKeuRes.status !== 200) {
-    throw new Error('Failed to login as keuangan_staff: ' + JSON.stringify(loginStaffKeuRes.body));
+  if (regSmRes.status !== 201) {
+    throw new Error('Failed to register keuangan manager: ' + JSON.stringify(regSmRes.body));
   }
-  const staffKeuToken = loginStaffKeuRes.body.token;
-  console.log('Staff Keuangan logged in successfully.');
+  const smToken = regSmRes.body.token;
+  console.log('Manager Keuangan registered successfully.');
 
-  // 4. Staff Marketing uploads document to 'SM Keuangan'
-  console.log('Staff Marketing uploads document targeted to SM Keuangan...');
+  // 3. Register Staff Keuangan test user (should NOT see the targeted doc)
+  console.log('Registering test Staff Keuangan...');
+  const regStaffKeuRes = await request('POST', '/api/auth/register', {}, {
+    username: 'keu_staff_' + suffix,
+    display_name: 'Staff Keuangan Test',
+    email: 'keu_staff_' + suffix + '@example.com',
+    password: 'password123',
+    division: 'keuangan',
+    role: 'staff',
+    jabatan: 'Staff'
+  });
+  if (regStaffKeuRes.status !== 201) {
+    throw new Error('Failed to register keuangan staff: ' + JSON.stringify(regStaffKeuRes.body));
+  }
+  const staffKeuToken = regStaffKeuRes.body.token;
+  console.log('Staff Keuangan registered successfully.');
+
+  // 4. Staff Marketing uploads document to 'Manager Keuangan'
+  console.log('Staff Marketing uploads document targeted to Manager Keuangan...');
   const uploadRes = await uploadFile(
     '/api/documents/submit_document',
     { Authorization: `Bearer ${staffToken}` },
@@ -154,12 +172,12 @@ async function runTests() {
       document_type: 'Laporan',
       sub_tipe: 'Bulanan',
       document_number: 'DOC-2026-001',
-      document_name: 'Laporan Bulanan Marketing ke SM Keuangan',
+      document_name: 'Laporan Bulanan Marketing ke Manager Keuangan',
       description: 'Ini deskripsi laporan',
-      penerima: JSON.stringify(['SM Keuangan']),
-      senderName: 'Staff Marketing',
+      penerima: JSON.stringify(['Manager Keuangan']),
+      senderName: 'Staff Marketing Test',
       senderDivision: 'marketing',
-      userId: loginStaffRes.body.user.id
+      userId: staffUserId
     }
   );
 
@@ -253,9 +271,9 @@ async function runTests() {
       document_name: 'LOI Penawaran Kerjasama',
       description: 'Ditujukan ke Direktur Umum',
       penerima: JSON.stringify(['Direktur Umum']),
-      senderName: 'Staff Marketing',
+      senderName: 'Staff Marketing Test',
       senderDivision: 'marketing',
-      userId: loginStaffRes.body.user.id
+      userId: staffUserId
     }
   );
   if (uploadDirUmumRes.status !== 201) {
@@ -382,6 +400,14 @@ async function runTests() {
     throw new Error('Admin failed to delete user: ' + JSON.stringify(adminDeleteUserRes.body));
   }
   console.log('User deleted successfully by admin.');
+
+  // Cleanup: delete test users created at the start
+  console.log('Cleaning up test users...');
+  const testUserIds = [staffUserId, regSmRes.body.user.id, regStaffKeuRes.body.user.id];
+  for (const uid of testUserIds) {
+    await request('DELETE', `/api/admin/users/${uid}`, { Authorization: `Bearer ${adminToken}` });
+  }
+  console.log('Test users cleaned up.');
 
   console.log('--- ALL INTEGRATION TESTS PASSED SUCCESSFULLY! ---');
   await pool.end();

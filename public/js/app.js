@@ -26,7 +26,7 @@ let activeTab = 'masuk';
 let sharedDocuments = [];
 let projects = [];
 let recipientsList = [];
-let selectedUploadFile = null;
+let selectedUploadFiles = [];
 let sharingCurrentPage = 1;
 const sharingPageSize = 10;
 let sharingSortField = 'tgl';
@@ -1149,6 +1149,69 @@ async function showApp() {
   await loadNotifications();
   checkNotificationPermission();
   switchSidebarTab('chat', false);
+  showSystemUpdateNotices();
+}
+
+function showSystemUpdateNotices() {
+  if (typeof SYSTEM_UPDATES === 'undefined' || !SYSTEM_UPDATES.length) return;
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const seenMap = JSON.parse(localStorage.getItem('sys_updates_seen') || '{}');
+  const seenToday = seenMap[today] || [];
+
+  const active = SYSTEM_UPDATES.filter(u => {
+    if (!u.id) return false;
+    if (u.publishDate && today < u.publishDate) return false;
+    if (u.expireDate && today > u.expireDate) return false;
+    return !seenToday.includes(u.id);
+  });
+
+  if (active.length === 0) return;
+
+  const listHtml = active.map(u => `
+    <div class="sys-update-item">
+      <div class="sys-update-title">${esc(u.title)}</div>
+      ${u.content ? `<div class="sys-update-content">${esc(u.content)}</div>` : ''}
+    </div>
+  `).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'custom-dialog-overlay';
+  overlay.innerHTML = `
+    <div class="custom-dialog-modal system-updates-modal">
+      <div class="custom-dialog-header">
+        <span class="custom-dialog-icon">🆕</span>
+        <span class="custom-dialog-title">Update Sistem Terbaru</span>
+      </div>
+      <div class="sys-update-list">${listHtml}</div>
+      <div class="custom-dialog-footer">
+        <button class="btn-primary-sm" style="background: var(--accent); border-color: var(--accent); color: white;" id="sys-update-ok">✔ Cek</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => {
+    seenMap[today] = [...new Set([...seenToday, ...active.map(u => u.id)])];
+    localStorage.setItem('sys_updates_seen', JSON.stringify(seenMap));
+    overlay.remove();
+    document.removeEventListener('keydown', handleKey);
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    }
+  };
+
+  overlay.querySelector('#sys-update-ok').onclick = close;
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  document.addEventListener('keydown', handleKey);
 }
 
 function showAuth() {
@@ -1355,7 +1418,7 @@ function initSharingEvents() {
   // Trigger Upload modal
   $('btn-upload-doc').addEventListener('click', () => {
     $('doc-upload-form').reset();
-    selectedUploadFile = null;
+    selectedUploadFiles = [];
     $('upload-file-info').classList.add('hidden');
     $('upload-error').textContent = '';
 
@@ -2226,35 +2289,56 @@ function setupDragAndDrop() {
     e.preventDefault();
     dropzone.classList.remove('dragover');
     if (e.dataTransfer.files.length > 0) {
-      handleSelectedFile(e.dataTransfer.files[0]);
+      handleSelectedFiles(e.dataTransfer.files);
     }
   });
 
   fileInput.addEventListener('change', () => {
     if (fileInput.files.length > 0) {
-      handleSelectedFile(fileInput.files[0]);
+      handleSelectedFiles(fileInput.files);
     }
+    fileInput.value = '';
   });
 }
 
-async function handleSelectedFile(file) {
+async function handleSelectedFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (files.length === 0) return;
+
   const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
-  const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+  const validFiles = [];
+  let invalidMsg = '';
 
-  if (!allowedExtensions.includes(ext)) {
-    await showCustomAlert('Format berkas tidak didukung! Hanya PDF, Word, Excel, dan Gambar (PNG/JPG/dll).');
-    return;
+  for (const file of files) {
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!allowedExtensions.includes(ext)) {
+      invalidMsg = 'Format berkas tidak didukung! Hanya PDF, Word, Excel, dan Gambar (PNG/JPG/dll).';
+      continue;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      invalidMsg = 'Ukuran berkas maksimal adalah 10MB!';
+      continue;
+    }
+
+    validFiles.push(file);
   }
 
-  if (file.size > 10 * 1024 * 1024) {
-    await showCustomAlert('Ukuran berkas maksimal adalah 10MB!');
-    return;
-  }
-
-  selectedUploadFile = file;
+  selectedUploadFiles = [...selectedUploadFiles, ...validFiles];
   const fileInfo = $('upload-file-info');
-  fileInfo.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-  fileInfo.classList.remove('hidden');
+  if (selectedUploadFiles.length > 0) {
+    fileInfo.textContent = selectedUploadFiles.length === 1
+      ? `${selectedUploadFiles[0].name} (${(selectedUploadFiles[0].size / 1024 / 1024).toFixed(2)} MB)`
+      : `${selectedUploadFiles.length} berkas: ${selectedUploadFiles.map(f => f.name).join(', ')}`;
+    fileInfo.classList.remove('hidden');
+  } else {
+    fileInfo.classList.add('hidden');
+  }
+
+  if (invalidMsg) {
+    await showCustomAlert(invalidMsg);
+  }
 }
 
 function resolveRecipientSelections(containerId) {
@@ -2340,7 +2424,7 @@ async function uploadDocSubmit(e) {
   e.preventDefault();
   $('upload-error').textContent = '';
 
-  if (!selectedUploadFile) {
+  if (selectedUploadFiles.length === 0) {
     $('upload-error').textContent = 'Silakan pilih berkas dokumen terlebih dahulu!';
     return;
   }
@@ -2359,7 +2443,9 @@ async function uploadDocSubmit(e) {
   formData.append('document_name', $('upload-doc-name').value.trim());
   formData.append('description', $('upload-description').value.trim());
   formData.append('penerima', JSON.stringify(resolvedRecipients));
-  formData.append('file', selectedUploadFile);
+  for (const f of selectedUploadFiles) {
+    formData.append('files', f);
+  }
   formData.append('senderName', currentUser.display_name);
   formData.append('senderDivision', currentUser.division);
   formData.append('userId', currentUser.id);
@@ -2381,7 +2467,7 @@ async function uploadDocSubmit(e) {
 
     $('modal-upload-overlay').classList.add('hidden');
     $('doc-upload-form').reset();
-    selectedUploadFile = null;
+    selectedUploadFiles = [];
     $('upload-file-info').classList.add('hidden');
 
     await showCustomAlert('Dokumen berhasil dikirim!');

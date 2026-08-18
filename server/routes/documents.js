@@ -285,22 +285,23 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/documents/submit_document
-router.post('/submit_document', upload.single('file'), async (req, res) => {
+router.post('/submit_document', upload.array('files', 20), async (req, res) => {
   try {
     const { project_name, document_type, sub_tipe, document_name, document_number, description, penerima, senderName, senderDivision, userId, tgl } = req.body;
 
     if (!document_type || !document_number) {
-      if (req.file) fs.unlinkSync(req.file.path);
+      if (req.files) req.files.forEach(f => { try { fs.unlinkSync(f.path); } catch (e) { } });
       return res.status(400).json({ error: 'Document type and document number are required' });
     }
 
-    if (!req.file) {
+    const files = req.files || [];
+    if (files.length === 0) {
       return res.status(400).json({ error: 'File upload is required' });
     }
 
     // Server-side validation: Staff cannot upload 'Kontrak'
     if (document_type.toLowerCase() === 'kontrak' && req.user.role === 'staff' && !req.user.is_admin) {
-      fs.unlinkSync(req.file.path);
+      files.forEach(f => { try { fs.unlinkSync(f.path); } catch (e) { } });
       return res.status(403).json({ error: 'Staf biasa tidak diperbolehkan mengunggah dokumen tipe Kontrak' });
     }
 
@@ -316,146 +317,158 @@ router.post('/submit_document', upload.single('file'), async (req, res) => {
     }
     const penerimaString = recipientsArray.join(',');
 
-    const filePath = '/uploads/' + req.file.filename;
+    const isMulti = files.length > 1;
+    const insertedDocs = [];
+    for (const file of files) {
+      const filePath = '/uploads/' + file.filename;
+      // Saat mengunggah beberapa file, nama dokumen ditambah nama file agar mudah dibedakan
+      const docName = isMulti
+        ? `${(document_name || 'Dokumen').trim()} - ${file.originalname}`
+        : (document_name || '').trim();
 
-    const insertQuery = tgl
-      ? `INSERT INTO shared_documents 
-         (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, tgl)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         RETURNING *`
-      : `INSERT INTO shared_documents 
-         (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         RETURNING *`;
+      const insertQuery = tgl
+        ? `INSERT INTO shared_documents 
+           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, tgl)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           RETURNING *`
+        : `INSERT INTO shared_documents 
+           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           RETURNING *`;
 
-    const queryParams = [
-      project_name,
-      document_type,
-      sub_tipe || '',
-      document_name || '',
-      document_number,
-      description || '',
-      filePath,
-      senderName || req.user.display_name,
-      senderDivision || req.user.division,
-      userId || req.user.id,
-      penerimaString
-    ];
-    if (tgl) {
-      queryParams.push(tgl);
-    }
-
-    const result = await db.query(insertQuery, queryParams);
-    const newDoc = result.rows[0];
-
-    // Trigger In-App Notification (Socket.io)
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('new_document_assigned', newDoc);
-    }
-
-    // Trigger Web Push Notifications (Background)
-    (async () => {
-      try {
-        const recipientsArray = (penerimaString || '').split(',').map(r => r.trim());
-        if (recipientsArray.length === 0) return;
-
-        // 1. Fetch all users and find who should get this
-        const usersRes = await db.query("SELECT * FROM users");
-        const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
-        const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
-
-        const targetUserIds = [];
-        for (const u of usersRes.rows) {
-          const userGroups = [u.display_name];
-          const mappedDiv = divisionLabels[u.division] || u.division;
-          const userLevel = jabatanHierarchy.indexOf(u.jabatan);
-
-          if (mappedDiv) {
-            userGroups.push('Divisi ' + mappedDiv);
-            if (u.jabatan) userGroups.push(u.jabatan + ' ' + mappedDiv);
-            if (userLevel > 0) {
-              jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
-                userGroups.push(lowerJab + ' ' + mappedDiv);
-              });
-            }
-          }
-          if (u.jabatan === 'Direktur Umum') userGroups.push('Direktur Umum');
-          else if (u.jabatan === 'Wakil Direktur' || u.jabatan === 'Wakil Direktur Utama') { userGroups.push('Wakil Direktur', 'Wakil Direktur Utama'); }
-          else if (u.jabatan === 'Direktur') userGroups.push('Direktur');
-          else if (u.jabatan === 'SM' || u.jabatan === 'Senior Manager') { userGroups.push('Semua SM', 'Semua Senior Manager'); }
-          else if (u.jabatan === 'Staff') userGroups.push('Semua Staff');
-
-          const hasAccess = userGroups.some(g => recipientsArray.includes(g));
-          // Don't send push to the sender themselves
-          if (hasAccess && u.id !== req.user.id) {
-            targetUserIds.push(u.id);
-          }
-        }
-
-        if (targetUserIds.length > 0) {
-          // 2. Insert notifications to DB
-          const notifMsg = `Dokumen Baru: ${newDoc.document_name}`;
-          const insertedNotifs = [];
-          for (const uid of targetUserIds) {
-            const notifRes = await db.query(
-              'INSERT INTO notifications (user_id, sender_id, document_id, message) VALUES ($1, $2, $3, $4) RETURNING *',
-              [uid, req.user.id, newDoc.id, notifMsg]
-            );
-            insertedNotifs.push(notifRes.rows[0]);
-          }
-
-          // Emit socket event with notification ID so frontend can track it
-          const io = req.app.get('io');
-          if (io) {
-            insertedNotifs.forEach(notif => {
-              io.to(`user_${notif.user_id}`).emit('new_persistent_notification', {
-                ...notif,
-                sender_name: newDoc.sender_name,
-                document_name: newDoc.document_name
-              });
-            });
-          }
-
-          // 3. Fetch push subscriptions
-          const placeholders = targetUserIds.map((_, i) => '$' + (i + 1)).join(',');
-          const subsRes = await db.query(`SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})`, targetUserIds);
-
-          const payload = JSON.stringify({
-            title: 'Dokumen Baru Diterima',
-            body: `Dokumen ${newDoc.document_name} (${newDoc.document_type}) telah dibagikan ke divisi Anda oleh ${newDoc.sender_name}.`,
-            url: '/'
-          });
-
-          for (const sub of subsRes.rows) {
-            const pushSub = {
-              endpoint: sub.endpoint,
-              keys: { p256dh: sub.p256dh, auth: sub.auth }
-            };
-            webpush.sendNotification(pushSub, payload).catch(err => {
-              if (err.statusCode === 410 || err.statusCode === 404) {
-                // Subscription has expired or is no longer valid, delete it
-                db.query("DELETE FROM push_subscriptions WHERE endpoint = $1", [sub.endpoint]).catch(console.error);
-              } else {
-                console.error('Push notification error:', err);
-              }
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to send push notifications:', err);
+      const queryParams = [
+        project_name,
+        document_type,
+        sub_tipe || '',
+        docName,
+        document_number,
+        description || '',
+        filePath,
+        senderName || req.user.display_name,
+        senderDivision || req.user.division,
+        userId || req.user.id,
+        penerimaString
+      ];
+      if (tgl) {
+        queryParams.push(tgl);
       }
-    })();
 
-    res.status(201).json({ message: 'Document uploaded successfully', document: newDoc });
+      const result = await db.query(insertQuery, queryParams);
+      insertedDocs.push(result.rows[0]);
+    }
+
+    // Trigger In-App Notification (Socket.io) + Web Push untuk setiap dokumen
+    const io = req.app.get('io');
+    for (const newDoc of insertedDocs) {
+      if (io) {
+        io.emit('new_document_assigned', newDoc);
+      }
+      sendDocumentNotifications(newDoc, req, db, webpush).catch(err => {
+        console.error('Failed to send push notifications:', err);
+      });
+    }
+
+    res.status(201).json({ message: 'Document uploaded successfully', count: insertedDocs.length, documents: insertedDocs });
   } catch (err) {
     console.error('Error submitting document:', err);
-    if (req.file && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (e) { }
+    if (req.files) {
+      req.files.forEach(f => {
+        if (f.path && fs.existsSync(f.path)) {
+          try { fs.unlinkSync(f.path); } catch (e) { }
+        }
+      });
     }
     res.status(500).json({ error: 'Database error' });
   }
 });
+
+async function sendDocumentNotifications(newDoc, req, db, webpush) {
+  const recipientsArray = (newDoc.penerima || '').split(',').map(r => r.trim());
+  if (recipientsArray.length === 0) return;
+
+  // 1. Fetch all users and find who should get this
+  const usersRes = await db.query("SELECT * FROM users");
+  const divisionLabels = { marketing: 'Marketing', sdm: 'SDM', keuangan: 'Keuangan', operasional: 'Operasional', it: 'IT' };
+  const jabatanHierarchy = ['Staff', 'Asisten Manager', 'Manager', 'Senior Manager', 'Direktur', 'Wakil Direktur', 'Wakil Direktur Utama', 'Direktur Umum'];
+
+  const targetUserIds = [];
+  for (const u of usersRes.rows) {
+    const userGroups = [u.display_name];
+    const mappedDiv = divisionLabels[u.division] || u.division;
+    const userLevel = jabatanHierarchy.indexOf(u.jabatan);
+
+    if (mappedDiv) {
+      userGroups.push('Divisi ' + mappedDiv);
+      if (u.jabatan) userGroups.push(u.jabatan + ' ' + mappedDiv);
+      if (userLevel > 0) {
+        jabatanHierarchy.slice(0, userLevel).forEach(lowerJab => {
+          userGroups.push(lowerJab + ' ' + mappedDiv);
+        });
+      }
+    }
+    if (u.jabatan === 'Direktur Umum') userGroups.push('Direktur Umum');
+    else if (u.jabatan === 'Wakil Direktur' || u.jabatan === 'Wakil Direktur Utama') { userGroups.push('Wakil Direktur', 'Wakil Direktur Utama'); }
+    else if (u.jabatan === 'Direktur') userGroups.push('Direktur');
+    else if (u.jabatan === 'SM' || u.jabatan === 'Senior Manager') { userGroups.push('Semua SM', 'Semua Senior Manager'); }
+    else if (u.jabatan === 'Staff') userGroups.push('Semua Staff');
+
+    const hasAccess = userGroups.some(g => recipientsArray.includes(g));
+    // Don't send push to the sender themselves
+    if (hasAccess && u.id !== req.user.id) {
+      targetUserIds.push(u.id);
+    }
+  }
+
+  if (targetUserIds.length === 0) return;
+
+  // 2. Insert notifications to DB
+  const notifMsg = `Dokumen Baru: ${newDoc.document_name}`;
+  const insertedNotifs = [];
+  for (const uid of targetUserIds) {
+    const notifRes = await db.query(
+      'INSERT INTO notifications (user_id, sender_id, document_id, message) VALUES ($1, $2, $3, $4) RETURNING *',
+      [uid, req.user.id, newDoc.id, notifMsg]
+    );
+    insertedNotifs.push(notifRes.rows[0]);
+  }
+
+  // Emit socket event with notification ID so frontend can track it
+  const io = req.app.get('io');
+  if (io) {
+    insertedNotifs.forEach(notif => {
+      io.to(`user_${notif.user_id}`).emit('new_persistent_notification', {
+        ...notif,
+        sender_name: newDoc.sender_name,
+        document_name: newDoc.document_name
+      });
+    });
+  }
+
+  // 3. Fetch push subscriptions
+  const placeholders = targetUserIds.map((_, i) => '$' + (i + 1)).join(',');
+  const subsRes = await db.query(`SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})`, targetUserIds);
+
+  const payload = JSON.stringify({
+    title: 'Dokumen Baru Diterima',
+    body: `Dokumen ${newDoc.document_name} (${newDoc.document_type}) telah dibagikan ke divisi Anda oleh ${newDoc.sender_name}.`,
+    url: '/'
+  });
+
+  for (const sub of subsRes.rows) {
+    const pushSub = {
+      endpoint: sub.endpoint,
+      keys: { p256dh: sub.p256dh, auth: sub.auth }
+    };
+    webpush.sendNotification(pushSub, payload).catch(err => {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        // Subscription has expired or is no longer valid, delete it
+        db.query("DELETE FROM push_subscriptions WHERE endpoint = $1", [sub.endpoint]).catch(console.error);
+      } else {
+        console.error('Push notification error:', err);
+      }
+    });
+  }
+}
 
 // PUT /api/documents/edit_document
 router.put('/edit_document', async (req, res) => {

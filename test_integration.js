@@ -66,7 +66,7 @@ function uploadFile(path, headers = {}, fields = {}, fileContent = 'dummy pdf co
     }
 
     body += `--${boundary}\r\n`;
-    body += `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n`;
+    body += `Content-Disposition: form-data; name="files"; filename="${fileName}"\r\n`;
     body += `Content-Type: application/pdf\r\n\r\n`;
     body += `${fileContent}\r\n`;
     body += `--${boundary}--\r\n`;
@@ -166,7 +166,7 @@ async function runTests() {
   if (uploadRes.status !== 201) {
     throw new Error('Failed to upload document: ' + JSON.stringify(uploadRes.body));
   }
-  const docId = uploadRes.body.document.id;
+  const docId = uploadRes.body.documents[0].id;
   console.log(`Document uploaded successfully. ID: ${docId}`);
 
   // 5. Verify SM Keuangan can see the document
@@ -261,7 +261,7 @@ async function runTests() {
   if (uploadDirUmumRes.status !== 201) {
     throw new Error('Failed to upload LOI: ' + JSON.stringify(uploadDirUmumRes.body));
   }
-  const loiDocId = uploadDirUmumRes.body.document.id;
+  const loiDocId = uploadDirUmumRes.body.documents[0].id;
 
   // Verify Direktur Umum can see it
   console.log('Verifying Direktur Umum can see the document...');

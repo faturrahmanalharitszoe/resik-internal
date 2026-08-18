@@ -34,6 +34,12 @@ test.describe('Sharing Folder E2E Tests', () => {
     }, { token, mockUserStr });
 
     await page.reload();
+    await expect(page.locator('#app')).toBeVisible();
+
+    // Tutup modal update sistem jika muncul (agar tidak menutupi elemen yang diklik)
+    await page.locator('.system-updates-modal').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+
     return user;
   }
 

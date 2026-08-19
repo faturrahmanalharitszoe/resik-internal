@@ -32,6 +32,7 @@ const sharingPageSize = 10;
 let sharingSortField = 'tgl';
 let sharingSortDir = 'desc';
 let selectedDocIds = new Set();
+let pendingShareToken = null;
 
 /* ─── NOTION STATE ─── */
 let notionPages = [];
@@ -296,8 +297,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ─── INIT ─── */
+const sharePathMatch = window.location.pathname.match(/^\/s\/([a-zA-Z0-9_-]+)\/?$/);
+if (sharePathMatch) {
+  pendingShareToken = sharePathMatch[1];
+}
+
 if (token && currentUser) {
-  showApp();
+  showApp().then(() => {
+    if (pendingShareToken) resolveSharedDocument(pendingShareToken);
+  });
 } else {
   showAuth();
 }
@@ -331,6 +339,7 @@ loginForm.addEventListener('submit', async (e) => {
 
     saveAuth(data.token, data.user);
     await showApp();
+    if (pendingShareToken) resolveSharedDocument(pendingShareToken);
   } catch (err) {
     $('login-error').textContent = err.message;
   }
@@ -358,6 +367,7 @@ registerForm.addEventListener('submit', async (e) => {
 
     saveAuth(data.token, data.user);
     await showApp();
+    if (pendingShareToken) resolveSharedDocument(pendingShareToken);
   } catch (err) {
     $('register-error').textContent = err.message;
   }
@@ -2044,6 +2054,12 @@ function renderDocumentsTable() {
            Preview
          </button>`
       : '';
+    const shareBtn = doc.share_token
+      ? `<button class="btn-action share-btn" onclick="event.stopPropagation(); copyShareLink('${doc.id}')">
+           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+           Bagikan
+         </button>`
+      : '';
 
     tr.style.cursor = 'pointer';
     tr.addEventListener('click', (e) => {
@@ -2079,6 +2095,7 @@ function renderDocumentsTable() {
         </button>
         ${downloadBtn}
         ${previewBtn}
+        ${shareBtn}
         ${editBtn}
         ${deleteDocBtn}
       </td>
@@ -2259,6 +2276,71 @@ function previewDocument(docId, filename, docName) {
   window.open(url, '_blank');
 }
 window.previewDocument = previewDocument;
+
+async function resolveSharedDocument(shareToken) {
+  pendingShareToken = null;
+  try {
+    const res = await fetch(`${API}/api/documents/share/${encodeURIComponent(shareToken)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      await showCustomAlert((data && data.error) || 'Link berbagi tidak valid.');
+      return;
+    }
+    if (!data || !data.id) {
+      await showCustomAlert('Dokumen tidak ditemukan.');
+      return;
+    }
+
+    // Ensure the doc exists in local list so detail modal can render
+    if (!sharedDocuments.some(d => d.id === data.id)) {
+      sharedDocuments.unshift(data);
+    }
+
+    switchView('sharing');
+    const filename = data.file ? data.file.replace(/\\/g, '/').split('/').pop() : '';
+    openDetailModal(data.id);
+    if (filename && isPreviewable(filename)) {
+      previewDocument(data.id, filename, data.document_name || filename);
+    }
+  } catch (err) {
+    console.error('Error resolving shared document:', err);
+    await showCustomAlert('Gagal membuka dokumen dari link berbagi.');
+  }
+}
+window.resolveSharedDocument = resolveSharedDocument;
+
+function copyShareLink(docId) {
+  const doc = sharedDocuments.find(d => d.id === docId);
+  if (!doc || !doc.share_token) {
+    showCustomAlert('Dokumen ini belum memiliki link berbagi.');
+    return;
+  }
+  const link = `${window.location.origin}/s/${doc.share_token}`;
+  const done = () => showCustomAlert(`Link berbagi disalin!\n\n${link}`);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(done).catch(() => {
+      fallbackCopy(link);
+      done();
+    });
+  } else {
+    fallbackCopy(link);
+    done();
+  }
+}
+window.copyShareLink = copyShareLink;
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) { }
+  document.body.removeChild(ta);
+}
 
 function closeDocPreview() {
   const overlay = $('doc-preview-overlay');

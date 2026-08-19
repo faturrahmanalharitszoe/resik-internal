@@ -15,7 +15,7 @@ async function getUserByRoleAndDivision(role, division) {
   let params = [role];
 
   if (division) {
-    query += ' AND division = $2';
+    query += ' AND LOWER(division) = LOWER($2)';
     params.push(division);
   }
 

@@ -1833,6 +1833,16 @@ html[data-theme="dark"] .sf-main-card {
   border-color: var(--danger);
 }
 
+.btn-action.share-btn {
+  border-color: rgba(251, 176, 64, 0.25);
+  color: #f0a13c;
+}
+
+.btn-action.share-btn:hover {
+  background: rgba(251, 176, 64, 0.12);
+  border-color: #f0a13c;
+}
+
 /* ─── CHAT MSG ACTIONS ─── */
 .msg-actions-wrap {
   position: relative;

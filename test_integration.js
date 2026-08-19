@@ -207,6 +207,35 @@ async function runTests() {
   }
   console.log('SM Keuangan preview verified successfully.');
 
+  // 6b. Verify share link resolution
+  console.log('Verifying share link works...');
+  const shareToken = uploadRes.body.documents[0].share_token;
+  if (!shareToken) {
+    throw new Error('Uploaded document does not have a share_token!');
+  }
+  const shareRes = await request('GET', `/api/documents/share/${shareToken}`, { Authorization: `Bearer ${staffKeuToken}` });
+  if (shareRes.status !== 200) {
+    throw new Error(`Share link resolve failed with status ${shareRes.status}: ${JSON.stringify(shareRes.body)}`);
+  }
+  if (shareRes.body.id !== docId) {
+    throw new Error('Share link resolved to the wrong document!');
+  }
+  console.log('Share link resolves correctly (even for non-recipient logged-in user).');
+
+  // 6c. Verify invalid share token returns 404
+  const badShareRes = await request('GET', '/api/documents/share/not-a-real-token', { Authorization: `Bearer ${staffKeuToken}` });
+  if (badShareRes.status !== 404) {
+    throw new Error(`Expected 404 for invalid share token, got ${badShareRes.status}`);
+  }
+  console.log('Invalid share token correctly returns 404.');
+
+  // 6d. Verify share endpoint requires auth
+  const noAuthShareRes = await request('GET', `/api/documents/share/${shareToken}`);
+  if (noAuthShareRes.status !== 401) {
+    throw new Error(`Expected 401 for unauthenticated share resolve, got ${noAuthShareRes.status}`);
+  }
+  console.log('Share endpoint correctly requires login (401 without token).');
+
   // 7. Verify Staff Keuangan CANNOT see the document
   console.log('Verifying Staff Keuangan cannot see the document in list...');
   const staffKeuDocsRes = await request('GET', '/api/documents', { Authorization: `Bearer ${staffKeuToken}` });

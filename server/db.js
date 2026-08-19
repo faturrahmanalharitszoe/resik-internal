@@ -172,6 +172,31 @@ async function runMigrations() {
       );
     `);
 
+    // 6b. Add share_token column for share links
+    await pool.query(`
+      ALTER TABLE shared_documents
+      ADD COLUMN IF NOT EXISTS share_token VARCHAR(64);
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_documents_share_token
+      ON shared_documents(share_token) WHERE share_token IS NOT NULL;
+    `);
+
+    // Backfill share_token for existing documents
+    const crypto = require('crypto');
+    const missingTokenRows = await pool.query(`
+      SELECT id FROM shared_documents WHERE share_token IS NULL OR share_token = ''
+    `);
+    for (const row of missingTokenRows.rows) {
+      await pool.query(
+        'UPDATE shared_documents SET share_token = $1 WHERE id = $2',
+        [crypto.randomBytes(12).toString('hex'), row.id]
+      );
+    }
+    if (missingTokenRows.rows.length > 0) {
+      console.log(`✅ Share token dibuat untuk ${missingTokenRows.rows.length} dokumen lama.`);
+    }
+
     // 7. Create notion_pages table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS notion_pages (

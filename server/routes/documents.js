@@ -274,13 +274,50 @@ router.get('/', async (req, res) => {
       penerima: row.penerima,
       tgl: row.tgl,
       created_at: row.created_at,
-      updated_at: row.updated_at
+      updated_at: row.updated_at,
+      share_token: row.share_token
     }));
 
     res.json(mappedDocs);
   } catch (err) {
     console.error('Error fetching documents:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// GET /api/documents/share/:token — resolve share link (requires login)
+router.get('/share/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ error: 'Token tidak valid' });
+    }
+    const result = await db.query(
+      'SELECT * FROM shared_documents WHERE share_token = $1',
+      [token]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Link tidak valid atau dokumen tidak ditemukan' });
+    }
+    const row = result.rows[0];
+    res.json({
+      id: row.id,
+      project_name: row.project_name,
+      document_type: row.document_type,
+      sub_tipe: row.sub_tipe,
+      document_name: row.document_name,
+      document_number: row.document_number,
+      description: row.description,
+      file: row.file_path,
+      senderName: row.sender_name,
+      senderDivision: row.sender_division,
+      penerima: row.penerima,
+      tgl: row.tgl,
+      share_token: row.share_token
+    });
+  } catch (err) {
+    console.error('Error resolving share link:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -328,12 +365,12 @@ router.post('/submit_document', upload.array('files', 20), async (req, res) => {
 
       const insertQuery = tgl
         ? `INSERT INTO shared_documents 
-           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, tgl)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, tgl, share_token)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            RETURNING *`
         : `INSERT INTO shared_documents 
-           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, share_token)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
            RETURNING *`;
 
       const queryParams = [
@@ -352,6 +389,7 @@ router.post('/submit_document', upload.array('files', 20), async (req, res) => {
       if (tgl) {
         queryParams.push(tgl);
       }
+      queryParams.push(require('crypto').randomBytes(12).toString('hex'));
 
       const result = await db.query(insertQuery, queryParams);
       insertedDocs.push(result.rows[0]);

@@ -592,6 +592,13 @@ function connectSocket() {
   });
 
   socket.on('new_persistent_notification', (notif) => {
+    // Desktop Tauri: tampilkan notifikasi native OS
+    if (notif.type === 'chat') {
+      showTauriNotification('Resik Internal', notif.message || 'Pesan baru');
+    } else {
+      showTauriNotification('Dokumen Baru', notif.document_name || 'Ada dokumen baru');
+    }
+
     // In-App Bell update
     const badge = $('notification-badge');
     if (badge) {
@@ -5895,7 +5902,30 @@ window.toggleStatsSection = toggleStatsSection;
 /* --- Mandatory Web Push Logic --- */
 let vapidPublicKey = null;
 
+/* --- Tauri Desktop Detection --- */
+function isTauriApp() {
+  return typeof window !== 'undefined' && !!window.__TAURI__ && !!window.__TAURI__.notification;
+}
+
+function showTauriNotification(title, body) {
+  if (isTauriApp()) {
+    window.__TAURI__.notification.sendNotification({ title, body }).catch((err) => {
+      console.error('Tauri notification failed', err);
+    });
+    return true;
+  }
+  return false;
+}
+
 async function checkNotificationPermission() {
+  // Di desktop Tauri: pakai notifikasi native, skip Web Push
+  if (isTauriApp()) {
+    const overlay = $('mandatory-push-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    window.__TAURI__.notification.requestPermission().catch(() => {});
+    return;
+  }
+
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
   const permission = Notification.permission;
@@ -6077,9 +6107,22 @@ async function markNotificationAsRead(id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Register service worker untuk PWA (independen dari izin notifikasi)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.error('Service worker registration failed', err);
+    });
+  }
+
   const btnAllowPush = $('btn-allow-push');
   if (btnAllowPush) {
     btnAllowPush.addEventListener('click', async () => {
+      // Di desktop Tauri tidak ada Web Push; cukup sembunyikan overlay
+      if (isTauriApp()) {
+        $('mandatory-push-overlay').classList.add('hidden');
+        $('push-error-msg').classList.add('hidden');
+        return;
+      }
       try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {

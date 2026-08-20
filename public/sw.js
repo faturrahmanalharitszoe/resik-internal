@@ -11,8 +11,8 @@ self.addEventListener('push', function(event) {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: '/icons/icon-192x192.png', // Fallback if no icon, ensure you have one later
-      badge: '/icons/icon-192x192.png',
+      icon: '/assets/favicon/android-icon-192x192.png',
+      badge: '/assets/favicon/android-icon-192x192.png',
       data: {
         url: data.url || '/'
       }

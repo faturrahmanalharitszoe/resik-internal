@@ -1566,10 +1566,12 @@ function populateDocTypes(selectId, selectedValue = '') {
 async function loadSharingProjects() {
   const data = await apiFetch('/api/documents/projects');
   if (!data) return;
-  projects = data;
+  // Backend sudah filter aktif=1, tapi filter lagi di client untuk safety (jika API lama mengembalikan aktif)
+  const filtered = Array.isArray(data) ? data.filter(p => p.aktif == null || String(p.aktif) === '1' || p.aktif === 1) : data;
+  projects = filtered;
 
   const placeholder = '<option value="" disabled selected>Pilih Proyek</option>';
-  const options = data.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+  const options = filtered.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
 
   const upProj = $('upload-project-name');
   const editProj = $('edit-project-name');
@@ -2619,6 +2621,18 @@ function openEditModal(docId) {
   $('edit-doc-id').value = doc.id;
   populateDocTypes('edit-doc-type', doc.document_type);
   $('edit-sub-tipe').value = doc.sub_tipe || '';
+
+  // Pastikan dropdown edit hanya menampilkan aktif=1, tapi tetap tampilkan nilai dokumen saat ini jika sudah non-aktif
+  const editProjEl = $('edit-project-name');
+  if (editProjEl && doc.project_name) {
+    const exists = projects.some(p => p.name === doc.project_name);
+    if (!exists) {
+      const opt = document.createElement('option');
+      opt.value = doc.project_name;
+      opt.textContent = doc.project_name + ' (non-aktif)';
+      editProjEl.appendChild(opt);
+    }
+  }
 
   if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
     jQuery('#edit-project-name').val(doc.project_name).trigger('change');

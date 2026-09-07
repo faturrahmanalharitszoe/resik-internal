@@ -2396,7 +2396,7 @@ async function handleSelectedFiles(fileList) {
   const files = Array.from(fileList || []);
   if (files.length === 0) return;
 
-  const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
+  const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
   const validFiles = [];
   let invalidMsg = '';
 
@@ -2404,7 +2404,7 @@ async function handleSelectedFiles(fileList) {
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
     if (!allowedExtensions.includes(ext)) {
-      invalidMsg = 'Format berkas tidak didukung! Hanya PDF, Word, Excel, dan Gambar (PNG/JPG/dll).';
+      invalidMsg = 'Format berkas tidak didukung! Hanya PDF, Word, Excel, PowerPoint, dan Gambar (PNG/JPG/dll).';
       continue;
     }
 

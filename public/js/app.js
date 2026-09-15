@@ -28,7 +28,7 @@ let projects = [];
 let recipientsList = [];
 let selectedUploadFiles = [];
 let sharingCurrentPage = 1;
-const sharingPageSize = 10;
+let sharingPageSize = 25;
 let sharingSortField = 'tgl';
 let sharingSortDir = 'desc';
 let selectedDocIds = new Set();
@@ -1994,6 +1994,12 @@ function renderDocumentsTable() {
       <button class="btn-secondary-sm" id="btn-sharing-prev" onclick="changeSharingPage(-1)" ${sharingCurrentPage === 1 ? 'disabled' : ''}>← Prev</button>
       <span id="sharing-page-info" style="font-size:13px; color:var(--text-secondary);">Halaman ${sharingCurrentPage} dari ${totalPages}</span>
       <button class="btn-secondary-sm" id="btn-sharing-next" onclick="changeSharingPage(1)" ${sharingCurrentPage === totalPages ? 'disabled' : ''}>Next →</button>
+      <select id="sharing-page-size" onchange="changeSharingPageSize(this.value)" style="margin-left:8px; padding:4px 8px; border:1px solid var(--border); border-radius:6px; font-size:13px; color:var(--text-secondary); cursor:pointer;">
+        <option value="10" ${sharingPageSize === 10 ? 'selected' : ''}>10 / halaman</option>
+        <option value="25" ${sharingPageSize === 25 ? 'selected' : ''}>25 / halaman</option>
+        <option value="50" ${sharingPageSize === 50 ? 'selected' : ''}>50 / halaman</option>
+        <option value="100" ${sharingPageSize === 100 ? 'selected' : ''}>100 / halaman</option>
+      </select>
     `;
   }
 
@@ -2014,7 +2020,7 @@ function renderDocumentsTable() {
     const subTipe = doc.sub_tipe ? `<span class="doc-sub">${esc(doc.sub_tipe)}</span>` : '';
 
     const displayRecs = getDisplayRecipients(doc.penerima);
-    const MAX_VISIBLE_RECIPIENTS = 3;
+    const MAX_VISIBLE_RECIPIENTS = 2;
     let recipientsStr = '';
     if (displayRecs.length <= MAX_VISIBLE_RECIPIENTS) {
       recipientsStr = displayRecs.map(r => {
@@ -2119,6 +2125,13 @@ function changeSharingPage(dir) {
   renderDocumentsTable();
 }
 window.changeSharingPage = changeSharingPage;
+
+function changeSharingPageSize(size) {
+  sharingPageSize = parseInt(size);
+  sharingCurrentPage = 1;
+  renderDocumentsTable();
+}
+window.changeSharingPageSize = changeSharingPageSize;
 
 async function deleteDocument(docId, docName) {
   const confirmed = await showCustomConfirm(`Hapus dokumen "${docName}" secara permanen? File juga akan ikut terhapus.`);

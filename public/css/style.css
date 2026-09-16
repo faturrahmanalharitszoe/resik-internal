@@ -1409,7 +1409,6 @@ html[data-theme="dark"] .sf-main-card {
 /* Date cell */
 .sf-td-date {
   white-space: nowrap;
-  width: 4%;
   padding-right: 4px;
 }
 
@@ -1427,7 +1426,6 @@ html[data-theme="dark"] .sf-main-card {
 
 /* Document cell */
 .sf-td-doc {
-  width: 52%;
   overflow: hidden;
   text-overflow: ellipsis;
   padding-right: 8px;
@@ -1457,13 +1455,16 @@ html[data-theme="dark"] .sf-main-card {
 
 /* Sender cell */
 .sf-td-sender {
-  width: 6%;
+  overflow: hidden;
 }
 
 .sf-sender-name {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sf-sender-div {
@@ -1474,7 +1475,7 @@ html[data-theme="dark"] .sf-main-card {
 
 /* Recipients cell */
 .sf-td-recipients {
-  width: 18%;
+  overflow: hidden;
 }
 
 .sf-recipients-wrap {
@@ -1567,7 +1568,7 @@ html[data-theme="dark"] .sf-main-card {
 
 /* ── Row checkbox ── */
 .sf-checkbox-cell {
-  width: 32px;
+  width: 34px;
   padding: 6px 2px !important;
   text-align: center;
 }
@@ -1687,7 +1688,6 @@ html[data-theme="dark"] .sf-main-card {
 
 /* Actions cell */
 .sf-td-actions {
-  width: 20%;
   white-space: normal;
 }
 

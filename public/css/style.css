@@ -1409,7 +1409,7 @@ html[data-theme="dark"] .sf-main-card {
 /* Date cell */
 .sf-td-date {
   white-space: nowrap;
-  width: 8%;
+  width: 5%;
 }
 
 .sf-date-day {
@@ -1426,7 +1426,7 @@ html[data-theme="dark"] .sf-main-card {
 
 /* Document cell */
 .sf-td-doc {
-  width: 38%;
+  width: 46%;
   overflow: hidden;
   text-overflow: ellipsis;
   padding-right: 8px;
@@ -1456,7 +1456,7 @@ html[data-theme="dark"] .sf-main-card {
 
 /* Sender cell */
 .sf-td-sender {
-  width: 10%;
+  width: 7%;
 }
 
 .sf-sender-name {

@@ -360,7 +360,7 @@ router.post('/submit_document', upload.array('files', 20), async (req, res) => {
       const filePath = '/uploads/' + file.filename;
       // Saat mengunggah beberapa file, nama dokumen ditambah nama file agar mudah dibedakan
       const docName = isMulti
-        ? `${(document_name || 'Dokumen').trim()} - ${file.originalname}`
+        ? `${(document_name || 'Dokumen').trim()} - ${path.parse(file.originalname).name}`
         : (document_name || '').trim();
 
       const insertQuery = tgl

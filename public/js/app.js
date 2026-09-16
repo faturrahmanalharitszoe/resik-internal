@@ -2089,7 +2089,7 @@ function renderDocumentsTable() {
         <div class="sf-date-time">${dateTime}</div>
       </td>
       <td class="sf-td-doc">
-        <div class="sf-doc-name">${esc(doc.document_name)}</div>
+        <div class="sf-doc-name" title="${esc(doc.document_name)}">${esc(doc.document_name)}</div>
         <div class="sf-doc-meta">
           ${typeBadge}${subTipe}
           <span class="doc-sub sf-doc-number">${esc(doc.document_number)}</span>

@@ -1841,6 +1841,206 @@ function getDisplayRecipients(penerimaStr) {
   return recs;
 }
 
+/* ── Multi-file: 1 upload = 1 row ── */
+// Normalize files array for a doc (supports new single-row multi-file + legacy single-file rows)
+// Recover original filename for legacy rows (stored as "1787...-1234.pptx",
+// original base kept in document_name suffix "Nama Dokumen - namaasli")
+function friendlyOriginalNameJS(storedPath, rawOriginal, documentName) {
+  const stored = String(storedPath || '').replace(/\\/g, '/').split('/').pop();
+  const ext = stored.includes('.') ? stored.substring(stored.lastIndexOf('.')) : '';
+  const orig = (rawOriginal || '').trim();
+  const looksGenerated = !orig || orig === stored || /^\d+-\d+\./.test(orig);
+  if (!looksGenerated) return orig;
+  const docName = String(documentName || '');
+  if (docName.includes(' - ')) {
+    const suffix = docName.substring(docName.lastIndexOf(' - ') + 3).trim();
+    if (suffix) {
+      if (ext && suffix.toLowerCase().endsWith(ext.toLowerCase())) return suffix;
+      return ext ? suffix + ext : suffix;
+    }
+  }
+  return orig || stored;
+}
+
+function getDocFiles(doc) {
+  if (Array.isArray(doc.files) && doc.files.length > 0) {
+    return doc.files.map(f => {
+      if (typeof f === 'string') {
+        const base = String(f).replace(/\\/g, '/').split('/').pop();
+        return { path: f, originalName: friendlyOriginalNameJS(f, base, doc.document_name), size: null };
+      }
+      const p = f.path || f.file || doc.file || '';
+      return { path: p, originalName: friendlyOriginalNameJS(p, f.originalName || f.name || '', doc.document_name), size: f.size != null ? f.size : null };
+    }).filter(f => f.path);
+  }
+  if (doc.file) {
+    const base = String(doc.file).replace(/\\/g, '/').split('/').pop();
+    return [{ path: doc.file, originalName: friendlyOriginalNameJS(doc.file, base, doc.document_name), size: null }];
+  }
+  return [];
+}
+
+// Group legacy split rows (1 upload previously created N rows, one per file)
+// into a single view-row. New uploads already arrive as 1 row with files[].
+function groupUploadsForView(docs) {
+  const groups = new Map();
+  const singleKeyDocs = [];
+
+  docs.forEach(doc => {
+    const files = getDocFiles(doc);
+    // Rows that already carry multiple files don't need grouping
+    if (files.length > 1) {
+      singleKeyDocs.push({
+        ...doc,
+        files,
+        files_count: files.length,
+        _groupIds: [doc.id],
+        _isGrouped: false
+      });
+      return;
+    }
+    // Grouping key: same uploader + same document_number + same minute + same project/type.
+    // Legacy multi-file uploads share identical tgl (same request) & document_number.
+    let minute = '';
+    try {
+      const d = new Date(doc.tgl);
+      if (!isNaN(d.getTime())) {
+        minute = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${d.getMinutes()}`;
+      }
+    } catch (e) { minute = String(doc.tgl || ''); }
+    const key = [
+      (doc.document_number || '').trim().toLowerCase(),
+      (doc.senderName || '').trim().toLowerCase(),
+      (doc.project_name || '').trim().toLowerCase(),
+      (doc.document_type || '').trim().toLowerCase(),
+      minute
+    ].join('|');
+
+    // Don't group rows without document_number (too risky to merge unrelated docs)
+    if (!(doc.document_number || '').trim()) {
+      singleKeyDocs.push({ ...doc, files, files_count: files.length, _groupIds: [doc.id], _isGrouped: false });
+      return;
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ ...doc, files });
+  });
+
+  const out = [...singleKeyDocs];
+  groups.forEach(list => {
+    if (list.length === 1) {
+      const d = list[0];
+      out.push({ ...d, files_count: d.files.length, _groupIds: [d.id], _isGrouped: false });
+      return;
+    }
+    // Merge N legacy rows into 1 view-row
+    const base = list[0];
+    const mergedFiles = [];
+    const seenPaths = new Set();
+    list.forEach(d => {
+      getDocFiles(d).forEach(f => {
+        if (!seenPaths.has(f.path)) { seenPaths.add(f.path); mergedFiles.push(f); }
+      });
+    });
+    // Derive clean document_name: legacy rows were "Base - filename"; strip to Base if common
+    let displayName = base.document_name || '';
+    const prefixParts = list.map(d => (d.document_name || '').split(' - ')[0].trim()).filter(Boolean);
+    if (prefixParts.length === list.length && new Set(prefixParts).size === 1) {
+      displayName = prefixParts[0];
+    }
+    out.push({
+      ...base,
+      document_name: displayName,
+      file: mergedFiles.length > 0 ? mergedFiles[0].path : base.file,
+      files: mergedFiles,
+      files_count: mergedFiles.length,
+      _groupIds: list.map(d => d.id),
+      _isGrouped: true,
+      _groupedNames: list.map(d => d.document_name)
+    });
+  });
+
+  // Keep newest first by default (renderDocumentsTable will re-sort)
+  out.sort((a, b) => new Date(b.tgl).getTime() - new Date(a.tgl).getTime());
+  return out;
+}
+
+function findGroupedDoc(docId) {
+  const grouped = groupUploadsForView(sharedDocuments);
+  for (const g of grouped) {
+    if (g.id === docId || (g._groupIds || []).includes(docId)) return g;
+  }
+  return sharedDocuments.find(d => d.id === docId) || null;
+}
+
+// Unduhan aman: ambil via fetch, pastikan bukan halaman error/HTML,
+// lalu simpan sebagai blob dengan NAMA ASLI. Tidak pernah menyimpan halaman
+// error sebagai .pdf/.pptx (penyebab file "rusak/crash" saat dibuka).
+async function downloadFileStored(storedPath, saveName, quiet) {
+  const stored = String(storedPath || '').replace(/\\/g, '/').split('/').pop();
+  const display = saveName || stored;
+  const url = `${API}/uploads/${encodeURIComponent(stored)}`;
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (e) {
+    if (!quiet) await showCustomAlert(`Gagal mengunduh "${display}": tidak dapat terhubung ke server.`);
+    return false;
+  }
+  const ct = (res.headers.get('content-type') || '').toLowerCase();
+  if (!res.ok || ct.includes('text/html')) {
+    if (!quiet) await showCustomAlert(`Gagal mengunduh "${display}": file tidak ditemukan di server ini.\n\nKemungkinan file diunggah dari server lain (database dipakai bersama). Buka aplikasi lewat alamat server tempat file diunggah.`);
+    return false;
+  }
+  const blob = await res.blob();
+  // Tolak payload yang jelas-jelas bukan file (mis. placeholder teks berukuran byte)
+  if (blob.size === 0) {
+    if (!quiet) await showCustomAlert(`Gagal mengunduh "${display}": file kosong di server.`);
+    return false;
+  }
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = display;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objUrl), 8000);
+  return true;
+}
+window.downloadFileStored = downloadFileStored;
+
+async function downloadOneFile(docId, storedName) {
+  const doc = findGroupedDoc(docId);
+  const files = doc ? getDocFiles(doc) : [];
+  const found = files.find(f => f.path.replace(/\\/g, '/').split('/').pop() === storedName);
+  await downloadFileStored(storedName, (found && found.originalName) || storedName, false);
+}
+window.downloadOneFile = downloadOneFile;
+
+async function downloadAllFiles(docId) {
+  const doc = findGroupedDoc(docId);
+  if (!doc) return;
+  const files = getDocFiles(doc);
+  if (files.length === 0) return;
+  if (files.length === 1) {
+    await downloadFileStored(files[0].path, files[0].originalName, false);
+    return;
+  }
+  // Sequential downloads (browser may ask permission for multiple downloads)
+  let ok = 0;
+  const failed = [];
+  for (const f of files) {
+    const good = await downloadFileStored(f.path, f.originalName, true);
+    if (good) ok++;
+    else failed.push(f.originalName || f.path);
+    await new Promise(r => setTimeout(r, 400));
+  }
+  if (failed.length > 0) {
+    await showCustomAlert(`Unduhan selesai: ${ok} berhasil, ${failed.length} gagal.\n\nFile tidak ditemukan di server ini:\n- ${failed.join('\n- ')}\n\nKemungkinan file diunggah dari server lain (database dipakai bersama).`);
+  }
+}
+window.downloadAllFiles = downloadAllFiles;
+
 function renderDocumentsTable() {
   const tbody = $('sharing-table-body');
   const emptyDiv = $('sharing-empty') || null;
@@ -1862,7 +2062,9 @@ function renderDocumentsTable() {
   };
   const divLabel = divisionLabels[(currentUser.division || '').toLowerCase()] || currentUser.division || '';
 
-  const filtered = sharedDocuments.filter(doc => {
+  // 1 upload = 1 row: group legacy per-file rows + new multi-file single rows
+  const viewDocs = groupUploadsForView(sharedDocuments);
+  const filtered = viewDocs.filter(doc => {
     // 1. Tab Filter
     if (activeTab === 'keluar') {
       // Staff: only show their own sent documents
@@ -1929,14 +2131,16 @@ function renderDocumentsTable() {
       // For Direktur
     }
 
-    // 2. Search Filter
+    // 2. Search Filter (include file names in multi-file uploads)
     if (searchVal) {
+      const fileNames = getDocFiles(doc).map(f => (f.originalName || '')).join(' ').toLowerCase();
       const matchSearch =
         (doc.document_name || '').toLowerCase().includes(searchVal) ||
         (doc.document_number || '').toLowerCase().includes(searchVal) ||
         (doc.document_type || '').toLowerCase().includes(searchVal) ||
         (doc.senderName || '').toLowerCase().includes(searchVal) ||
-        (doc.description || '').toLowerCase().includes(searchVal);
+        (doc.description || '').toLowerCase().includes(searchVal) ||
+        fileNames.includes(searchVal);
       if (!matchSearch) return false;
     }
 
@@ -2016,7 +2220,7 @@ function renderDocumentsTable() {
 
     const senderDivLabel = divisionLabels[doc.senderDivision] || doc.senderDivision || '';
 
-    const typeBadge = `<span class="badge-type ${doc.document_type.toLowerCase()}">${esc(doc.document_type)}</span>`;
+    const typeBadge = `<span class="badge-type ${(doc.document_type || '').toLowerCase()}">${esc(doc.document_type)}</span>`;
     const subTipe = doc.sub_tipe ? `<span class="doc-sub">${esc(doc.sub_tipe)}</span>` : '';
 
     const displayRecs = getDisplayRecipients(doc.penerima);
@@ -2041,7 +2245,36 @@ function renderDocumentsTable() {
       recipientsStr += `<span class="sf-recipient-more">+${hidden.length}<span class="sf-recipient-tooltip">${tooltipContent}</span></span>`;
     }
 
-    const isDocSelected = selectedDocIds.has(doc.id);
+    // ── 1 row = 1 upload: derive file list ──
+    const docFiles = getDocFiles(doc);
+    const filesCount = docFiles.length;
+    const isMultiFile = filesCount > 1;
+    const filesBadge = isMultiFile
+      ? ` <span class="tag-pill tag-blue" title="${filesCount} file dalam 1 upload">📁 ${filesCount} file</span>`
+      : '';
+    const MAX_VISIBLE_FILES = 3;
+    let filesListHtml = '';
+    if (isMultiFile) {
+      const visibleFiles = docFiles.slice(0, MAX_VISIBLE_FILES);
+      const hiddenCount = filesCount - visibleFiles.length;
+      filesListHtml = `<div class="sf-files-wrap" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">` +
+        visibleFiles.map(f => {
+          const fname = f.path.replace(/\\/g, '/').split('/').pop();
+          const rawLabel = f.originalName || fname;
+          const label = esc(rawLabel);
+          const dlAttr = esc(rawLabel);
+          const prevBtn = isPreviewable(fname)
+            ? `<a href="#" title="Preview ${label}" onclick="event.stopPropagation(); previewDocument('${doc.id}', '${fname.replace(/'/g, "\\'")}', '${label.replace(/'/g, "\\'")}'); return false;" style="text-decoration:none;">👁️</a>`
+            : '';
+          return `<span class="tag-pill tag-grey" title="${label}" style="max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📄 ${label} ` +
+            `<a href="#" title="Unduh ${label}" onclick="event.stopPropagation(); downloadOneFile('${doc.id}', '${fname.replace(/'/g, "\\'")}'); return false;" style="text-decoration:none;">⬇️</a>${prevBtn}</span>`;
+        }).join('') +
+        (hiddenCount > 0 ? `<span class="tag-pill tag-grey" title="Lihat semua di Detail">+${hiddenCount} lainnya</span>` : '') +
+        `</div>`;
+    }
+
+    const groupIds = doc._groupIds || [doc.id];
+    const isDocSelected = groupIds.some(id => selectedDocIds.has(id));
     const canEdit = (doc.senderName || '').toLowerCase().trim() === (currentUser.display_name || '').toLowerCase().trim();
     const canDelete = currentUser.is_admin || currentUser.username === 'admin' || currentUser.username === 'administrator';
     const editBtn = canEdit
@@ -2056,15 +2289,22 @@ function renderDocumentsTable() {
            Hapus
          </button>`
       : '';
-    const dlFileName = doc.file ? doc.file.replace(/\\/g, '/').split('/').pop() : '';
-    const downloadBtn = doc.file
-      ? `<a class="btn-action download-btn" style="text-decoration:none; display:inline-flex;" href="${API}/uploads/${dlFileName}" download="${dlFileName}" onclick="event.stopPropagation();">
-           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-           Unduh
-         </a>`
+    const downloadBtn = filesCount > 0
+      ? (isMultiFile
+        ? `<button class="btn-action download-btn" onclick="event.stopPropagation(); downloadAllFiles('${doc.id}')">
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+             Unduh (${filesCount})
+           </button>`
+        : (() => {
+          const dlFileName = docFiles[0].path.replace(/\\/g, '/').split('/').pop();
+          return `<button class="btn-action download-btn" onclick="event.stopPropagation(); downloadOneFile('${doc.id}', '${dlFileName.replace(/'/g, "\\'")}')">
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+             Unduh
+           </button>`;
+        })())
       : '';
-    const previewBtn = (doc.file && isPreviewable(doc.file))
-      ? `<button class="btn-action preview-btn" onclick="event.stopPropagation(); previewDocument('${doc.id}', '${doc.file.replace(/\\/g, '/').split('/').pop().replace(/'/g, "\\'")}', '${esc(doc.document_name).replace(/'/g, "\\'")}')">
+    const previewBtn = (!isMultiFile && filesCount === 1 && isPreviewable(docFiles[0].path))
+      ? `<button class="btn-action preview-btn" onclick="event.stopPropagation(); previewDocument('${doc.id}', '${docFiles[0].path.replace(/\\/g, '/').split('/').pop().replace(/'/g, "\\'")}', '${esc(docFiles[0].originalName || doc.document_name).replace(/'/g, "\\'")}')">
            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
            Preview
          </button>`
@@ -2089,12 +2329,13 @@ function renderDocumentsTable() {
         <div class="sf-date-time">${dateTime}</div>
       </td>
       <td class="sf-td-doc">
-        <div class="sf-doc-name" title="${esc(doc.document_name)}">${esc(doc.document_name)}</div>
+        <div class="sf-doc-name" title="${esc(doc.document_name)}">${esc(doc.document_name)}${filesBadge}</div>
         <div class="sf-doc-meta">
           ${typeBadge}${subTipe}
           <span class="doc-sub sf-doc-number">${esc(doc.document_number)}</span>
           ${doc.project_name ? `<span class="doc-sub">${esc(doc.project_name)}</span>` : ''}
         </div>
+        ${filesListHtml}
       </td>
       <td class="sf-td-sender">
         <div class="sf-sender-name">${esc(toTitleCase(doc.senderName))}</div>
@@ -2106,7 +2347,7 @@ function renderDocumentsTable() {
       <td class="sf-td-actions">
         <button class="btn-action view-btn" onclick="event.stopPropagation(); openDetailModal('${doc.id}')">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          Detail
+          Detail${isMultiFile ? ` (${filesCount})` : ''}
         </button>
         ${downloadBtn}
         ${previewBtn}
@@ -2134,17 +2375,35 @@ function changeSharingPageSize(size) {
 window.changeSharingPageSize = changeSharingPageSize;
 
 async function deleteDocument(docId, docName) {
-  const confirmed = await showCustomConfirm(`Hapus dokumen "${docName}" secara permanen? File juga akan ikut terhapus.`);
+  // 1 row = 1 upload: hapus semua id dalam grup (legacy split rows maupun single-row multi-file)
+  const grouped = findGroupedDoc(docId);
+  const idsToDelete = (grouped && grouped._groupIds && grouped._groupIds.length > 0) ? grouped._groupIds : [docId];
+  const fileCount = grouped ? getDocFiles(grouped).length : 1;
+  const extra = fileCount > 1 ? ` (${fileCount} file dalam 1 upload)` : '';
+  const confirmed = await showCustomConfirm(`Hapus dokumen "${docName}"${extra} secara permanen? Semua file juga akan ikut terhapus.`);
   if (!confirmed) return;
   try {
-    const res = await fetch(`${API}/api/documents/${docId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
-    if (!res.ok) { showCustomAlert(data.error || 'Gagal menghapus dokumen'); return; }
+    if (idsToDelete.length > 1) {
+      const res = await fetch(`${API}/api/documents/bulk_delete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: idsToDelete })
+      });
+      const data = await res.json();
+      if (!res.ok) { showCustomAlert(data.error || 'Gagal menghapus dokumen'); return; }
+    } else {
+      const res = await fetch(`${API}/api/documents/${docId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) { showCustomAlert(data.error || 'Gagal menghapus dokumen'); return; }
+    }
     showCustomAlert('Dokumen berhasil dihapus!');
-    sharedDocuments = sharedDocuments.filter(d => d.id !== docId);
+    const delSet = new Set(idsToDelete);
+    sharedDocuments = sharedDocuments.filter(d => !delSet.has(d.id));
+    idsToDelete.forEach(id => selectedDocIds.delete(id));
+    updateBulkBar();
     renderDocumentsTable();
   } catch (err) {
     showCustomAlert('Terjadi kesalahan saat menghapus dokumen');
@@ -2172,12 +2431,14 @@ function sortDocuments(field) {
 }
 window.sortDocuments = sortDocuments;
 
-/* ── Row Selection / Bulk Actions ── */
+/* ── Row Selection / Bulk Actions (1 row = 1 upload) ── */
 function toggleDocSelection(docId, checked) {
+  const grouped = findGroupedDoc(docId);
+  const ids = (grouped && grouped._groupIds && grouped._groupIds.length > 0) ? grouped._groupIds : [docId];
   if (checked) {
-    selectedDocIds.add(docId);
+    ids.forEach(id => selectedDocIds.add(id));
   } else {
-    selectedDocIds.delete(docId);
+    ids.forEach(id => selectedDocIds.delete(id));
   }
   updateBulkBar();
 }
@@ -2194,8 +2455,12 @@ function toggleSelectAll(checkbox) {
       if (match) {
         const idMatch = match.match(/toggleDocSelection\('([^']+)'/);
         if (idMatch) {
-          if (checkbox.checked) selectedDocIds.add(idMatch[1]);
-          else selectedDocIds.delete(idMatch[1]);
+          const grouped = findGroupedDoc(idMatch[1]);
+          const ids = (grouped && grouped._groupIds && grouped._groupIds.length > 0) ? grouped._groupIds : [idMatch[1]];
+          ids.forEach(id => {
+            if (checkbox.checked) selectedDocIds.add(id);
+            else selectedDocIds.delete(id);
+          });
         }
       }
     }
@@ -2315,16 +2580,30 @@ async function resolveSharedDocument(shareToken) {
       return;
     }
 
-    // Ensure the doc exists in local list so detail modal can render
-    if (!sharedDocuments.some(d => d.id === data.id)) {
-      sharedDocuments.unshift(data);
-    }
+    // 1 link = 1 upload: backend may return merged files (+ _groupIds for legacy splits).
+    // Replace any sibling rows locally with the merged doc so detail shows all files.
+    const incomingFiles = Array.isArray(data.files) && data.files.length > 0
+      ? data.files
+      : (data.file ? [{ path: data.file, originalName: String(data.file).replace(/\\/g, '/').split('/').pop(), size: null }] : []);
+    const mergedDoc = {
+      ...data,
+      files: incomingFiles,
+      files_count: incomingFiles.length,
+      _groupIds: Array.isArray(data._groupIds) && data._groupIds.length > 0 ? data._groupIds : [data.id],
+      _isGrouped: Array.isArray(data._groupIds) && data._groupIds.length > 1
+    };
+    const knownIds = new Set(mergedDoc._groupIds);
+    sharedDocuments = sharedDocuments.filter(d => !knownIds.has(d.id));
+    sharedDocuments.unshift(mergedDoc);
 
     switchView('sharing');
-    const filename = data.file ? data.file.replace(/\\/g, '/').split('/').pop() : '';
-    openDetailModal(data.id);
-    if (filename && isPreviewable(filename)) {
-      previewDocument(data.id, filename, data.document_name || filename);
+    openDetailModal(mergedDoc.id);
+    // Only auto-preview for single-file uploads; multi-file opens the file list in Detail
+    if (incomingFiles.length === 1) {
+      const filename = (incomingFiles[0].path || '').replace(/\\/g, '/').split('/').pop();
+      if (filename && isPreviewable(filename)) {
+        previewDocument(mergedDoc.id, filename, incomingFiles[0].originalName || mergedDoc.document_name || filename);
+      }
     }
   } catch (err) {
     console.error('Error resolving shared document:', err);
@@ -2334,13 +2613,16 @@ async function resolveSharedDocument(shareToken) {
 window.resolveSharedDocument = resolveSharedDocument;
 
 function copyShareLink(docId) {
-  const doc = sharedDocuments.find(d => d.id === docId);
+  const doc = findGroupedDoc(docId) || sharedDocuments.find(d => d.id === docId);
   if (!doc || !doc.share_token) {
     showCustomAlert('Dokumen ini belum memiliki link berbagi.');
     return;
   }
+  // 1 link = 1 upload: token resolves to all files in this upload (backend merges legacy splits)
+  const n = getDocFiles(doc).length;
   const link = `${window.location.origin}/s/${doc.share_token}`;
-  const done = () => showCustomAlert(`Link berbagi disalin!\n\n${link}`);
+  const info = n > 1 ? ` (1 upload, ${n} file)` : '';
+  const done = () => showCustomAlert(`Link berbagi disalin${info}!\n\n${link}`);
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(link).then(done).catch(() => {
       fallbackCopy(link);
@@ -2599,8 +2881,7 @@ async function editDocSubmit(e) {
     timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
   }
 
-  const body = {
-    id: docId,
+  const baseBody = {
     project_name: $('edit-project-name').value,
     document_type: $('edit-doc-type').value,
     sub_tipe: $('edit-sub-tipe').value.trim(),
@@ -2612,12 +2893,29 @@ async function editDocSubmit(e) {
   };
 
   try {
-    const res = await apiFetch('/api/documents/edit_document', {
-      method: 'PUT',
-      body
-    });
+    // 1 row = 1 upload: if editing a grouped legacy upload, apply changes to all rows in group
+    const grouped = findGroupedDoc(docId);
+    const idsToUpdate = (grouped && grouped._groupIds && grouped._groupIds.length > 1) ? grouped._groupIds : [docId];
+    for (const gid of idsToUpdate) {
+      // Preserve per-file suffix on legacy grouped names: keep base name only for first, others keep suffix
+      const body = { ...baseBody, id: gid };
+      if (idsToUpdate.length > 1 && grouped && grouped._isGrouped) {
+        const orig = sharedDocuments.find(d => d.id === gid);
+        const suffix = orig && orig.document_name && orig.document_name.includes(' - ')
+          ? orig.document_name.substring(orig.document_name.indexOf(' - '))
+          : '';
+        // Only append suffix if base name changed and suffix not already included
+        if (suffix && !baseBody.document_name.endsWith(suffix)) {
+          body.document_name = baseBody.document_name + suffix;
+        }
+      }
+      const res = await apiFetch('/api/documents/edit_document', {
+        method: 'PUT',
+        body
+      });
 
-    if (res?.error) throw new Error(res.error);
+      if (res?.error) throw new Error(res.error);
+    }
 
     $('modal-edit-overlay').classList.add('hidden');
     await showCustomAlert('Informasi dokumen berhasil diubah!');
@@ -2628,7 +2926,7 @@ async function editDocSubmit(e) {
 }
 
 function openEditModal(docId) {
-  const doc = sharedDocuments.find(d => d.id === docId);
+  const doc = findGroupedDoc(docId) || sharedDocuments.find(d => d.id === docId);
   if (!doc) return;
 
   $('edit-doc-id').value = doc.id;
@@ -2720,7 +3018,7 @@ function openEditModal(docId) {
 window.openEditModal = openEditModal;
 
 function openDetailModal(docId) {
-  const doc = sharedDocuments.find(d => d.id === docId);
+  const doc = findGroupedDoc(docId) || sharedDocuments.find(d => d.id === docId);
   if (!doc) return;
 
   $('peek-doc-name').textContent = doc.document_name;
@@ -2758,61 +3056,80 @@ function openDetailModal(docId) {
     return `<span class="tag-pill ${tagClass}" style="margin: 3px;">${esc(r)}</span>`;
   }).join(' ');
 
+  // ── 1 upload = 1 row: list all files in this upload ──
+  const docFiles = getDocFiles(doc);
   const downloadBtn = $('peek-btn-download');
-  downloadBtn.href = doc.file;
+  if (docFiles.length > 1) {
+    downloadBtn.removeAttribute('href');
+    downloadBtn.removeAttribute('download');
+    downloadBtn.onclick = (e) => { e.preventDefault(); downloadAllFiles(doc.id); };
+    downloadBtn.innerHTML = `Download Semua (${docFiles.length} file)`;
+  } else if (docFiles.length === 1) {
+    const storedSingle = docFiles[0].path.replace(/\\/g, '/').split('/').pop();
+    downloadBtn.removeAttribute('href');
+    downloadBtn.removeAttribute('download');
+    downloadBtn.onclick = (e) => { e.preventDefault(); downloadOneFile(doc.id, storedSingle); };
+    downloadBtn.innerHTML = `Download`;
+  } else {
+    downloadBtn.onclick = null;
+    downloadBtn.removeAttribute('href');
+    downloadBtn.removeAttribute('download');
+    downloadBtn.innerHTML = `Download`;
+  }
 
   const previewContainer = $('peek-preview-container');
   const placeholder = $('peek-preview-placeholder');
 
-  const existingPreview = previewContainer.querySelector('.preview-element');
-  if (existingPreview) existingPreview.remove();
+  previewContainer.querySelectorAll('.preview-element').forEach(el => el.remove());
 
   placeholder.classList.add('hidden');
 
-  const fileUrl = doc.file;
-  const ext = fileUrl.substring(fileUrl.lastIndexOf('.')).toLowerCase();
+  const fileIconFor = (fname) => {
+    const e = (fname || '').substring((fname || '').lastIndexOf('.')).toLowerCase();
+    if (e === '.pdf') return { icon: '📕', label: 'Dokumen PDF' };
+    if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'].includes(e)) return { icon: '🖼️', label: 'Gambar / Foto' };
+    if (['.doc', '.docx'].includes(e)) return { icon: '📝', label: 'Dokumen Word' };
+    if (['.xls', '.xlsx'].includes(e)) return { icon: '📊', label: 'Dokumen Excel' };
+    if (['.ppt', '.pptx'].includes(e)) return { icon: '📽️', label: 'Presentasi' };
+    return { icon: '📁', label: 'Berkas' };
+  };
 
-  let fileIcon = '📄';
-  let fileTypeLabel = 'Dokumen';
+  const listCard = document.createElement('div');
+  listCard.className = 'preview-element';
+  listCard.style.display = 'flex';
+  listCard.style.flexDirection = 'column';
+  listCard.style.gap = '8px';
+  listCard.style.padding = '16px';
+  listCard.style.width = '100%';
 
-  if (ext === '.pdf') {
-    fileIcon = '📕';
-    fileTypeLabel = 'Dokumen PDF';
-  } else if (['.jpg', '.jpeg', '.png', '.gif'].includes(ext)) {
-    fileIcon = '🖼️';
-    fileTypeLabel = 'Gambar / Foto';
-  } else {
-    fileIcon = '📁';
-    fileTypeLabel = 'Berkas';
-  }
-  const targetUrl = `/api/documents/preview/${doc.id}?token=${encodeURIComponent(token)}`;
+  const headerHtml = docFiles.length > 1
+    ? `<div style="font-size:13px; font-weight:700; color:var(--text-primary);">📁 ${docFiles.length} file dalam 1 upload</div>`
+    : `<div style="font-size:13px; font-weight:700; color:var(--text-primary);">📎 Lampiran</div>`;
 
-  const actionCard = document.createElement('div');
-  actionCard.className = 'preview-element';
-  actionCard.style.display = 'flex';
-  actionCard.style.flexDirection = 'column';
-  actionCard.style.alignItems = 'center';
-  actionCard.style.justifyContent = 'center';
-  actionCard.style.gap = '16px';
-  actionCard.style.padding = '24px';
-  actionCard.style.textAlign = 'center';
-  actionCard.style.width = '100%';
-  actionCard.style.height = '100%';
-
-  actionCard.innerHTML = `
-    <span style="font-size: 48px; line-height: 1;">${fileIcon}</span>
-    <div>
-      <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">${esc(doc.document_name)}</div>
-      <div style="font-size: 12px; color: var(--text-secondary);">${fileTypeLabel}</div>
-    </div>
-    <button class="btn-primary-sm" onclick="window.open('${targetUrl}', '_blank')" style="display: inline-flex; align-items: center; gap: 6px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
-      </svg>
-      Buka Lampiran di Tab Baru
-    </button>
-  `;
-  previewContainer.appendChild(actionCard);
+  listCard.innerHTML = headerHtml + (docFiles.length === 0
+    ? `<div style="font-size:12px; color:var(--text-muted);">Tidak ada file.</div>`
+    : docFiles.map(f => {
+      const fname = f.path.replace(/\\/g, '/').split('/').pop();
+      const { icon, label } = fileIconFor(fname);
+      const rawName = f.originalName || fname;
+      const dispName = esc(rawName);
+      const dlAttr = esc(rawName);
+      const targetUrl = `/api/documents/preview/${doc.id}?f=${encodeURIComponent(fname)}&token=${encodeURIComponent(token)}`;
+      const canPrev = isPreviewable(fname);
+      return `
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+          <span style="font-size:24px; line-height:1;">${icon}</span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${dispName}">${dispName}</div>
+            <div style="font-size:11px; color:var(--text-secondary);">${label}</div>
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            ${canPrev ? `<button class="btn-secondary-sm" onclick="previewDocument('${doc.id}', '${fname.replace(/'/g, "\\'")}', '${dispName.replace(/'/g, "\\'")}')">Preview</button>` : ''}
+            <button class="btn-secondary-sm" onclick="downloadOneFile('${doc.id}', '${fname.replace(/'/g, "\\'")}')">Unduh</button>
+          </div>
+        </div>`;
+    }).join(''));
+  previewContainer.appendChild(listCard);
 
   // Log view event (fire-and-forget, ignore errors)
   apiFetch(`/api/documents/${doc.id}/view`, { method: 'POST' }).catch(() => { });

@@ -44,6 +44,12 @@ if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 app.use('/uploads', express.static(uploadsPath));
+// File yang tidak ada di disk: kembalikan 404 eksplisit agar TIDAK jatuh ke
+// index.html (fallback SPA di bawah). Tanpa ini, browser mengunduh halaman HTML
+// yang tersimpan sebagai .pdf/.pptx sehingga file terlihat "rusak/crash".
+app.use('/uploads', (req, res) => {
+  res.status(404).send('File tidak ditemukan di server');
+});
 
 // REST Routes
 app.use('/api/auth', authRoutes);

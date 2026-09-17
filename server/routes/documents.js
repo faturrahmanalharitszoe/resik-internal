@@ -9,6 +9,83 @@ const webpush = require('../webpush');
 const router = express.Router();
 router.use(authMiddleware);
 
+// Helper: normalize files column to array of {path, originalName, size}
+// 1 upload = 1 row, files stored as JSONB array. Fallback to file_path for legacy rows.
+// Legacy rows lost the original filename (stored as "1787...-1234.pptx"); recover it
+// from document_name suffix ("Nama Dokumen - namaasli") + stored extension.
+function friendlyOriginalName(storedPath, rawOriginal, documentName) {
+  const stored = String(storedPath || '').replace(/\\/g, '/').split('/').pop();
+  const ext = stored.includes('.') ? stored.substring(stored.lastIndexOf('.')) : '';
+  let orig = (rawOriginal || '').trim();
+  const looksGenerated = !orig || orig === stored || /^\d+-\d+\./.test(orig);
+  if (!looksGenerated) return orig;
+  const docName = String(documentName || '');
+  if (docName.includes(' - ')) {
+    const suffix = docName.substring(docName.lastIndexOf(' - ') + 3).trim();
+    if (suffix) {
+      if (ext && suffix.toLowerCase().endsWith(ext.toLowerCase())) return suffix;
+      return ext ? suffix + ext : suffix;
+    }
+  }
+  return orig || stored;
+}
+
+function normalizeFiles(row) {
+  let files = [];
+  try {
+    if (Array.isArray(row.files)) {
+      files = row.files;
+    } else if (typeof row.files === 'string' && row.files) {
+      files = JSON.parse(row.files);
+    }
+  } catch (e) {
+    files = [];
+  }
+  if (!Array.isArray(files) || files.length === 0) {
+    if (row.file_path) {
+      const base = String(row.file_path).replace(/\\/g, '/').split('/').pop();
+      files = [{ path: row.file_path, originalName: friendlyOriginalName(row.file_path, base, row.document_name), size: null }];
+    }
+  }
+  // Ensure shape
+  files = files.map(f => {
+    if (typeof f === 'string') {
+      const base = String(f).replace(/\\/g, '/').split('/').pop();
+      return { path: f, originalName: friendlyOriginalName(f, base, row.document_name), size: null };
+    }
+    const p = f.path || f.file || '';
+    return {
+      path: p,
+      originalName: friendlyOriginalName(p, f.originalName || f.name || '', row.document_name),
+      size: f.size != null ? f.size : null
+    };
+  }).filter(f => f.path);
+  return files;
+}
+
+function mapDocRow(row) {
+  const files = normalizeFiles(row);
+  return {
+    id: row.id,
+    project_name: row.project_name,
+    document_type: row.document_type,
+    sub_tipe: row.sub_tipe,
+    document_name: row.document_name,
+    document_number: row.document_number,
+    description: row.description,
+    file: files.length > 0 ? files[0].path : row.file_path,
+    files,
+    files_count: files.length,
+    senderName: row.sender_name,
+    senderDivision: row.sender_division,
+    penerima: row.penerima,
+    tgl: row.tgl,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    share_token: row.share_token
+  };
+}
+
 // Setup multer upload directory
 const uploadDir = path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -259,24 +336,8 @@ router.get('/', async (req, res) => {
 
     const result = await db.query(query, params);
 
-    // Map database field names to what frontend expects
-    const mappedDocs = result.rows.map(row => ({
-      id: row.id,
-      project_name: row.project_name,
-      document_type: row.document_type,
-      sub_tipe: row.sub_tipe,
-      document_name: row.document_name,
-      document_number: row.document_number,
-      description: row.description,
-      file: row.file_path,
-      senderName: row.sender_name,
-      senderDivision: row.sender_division,
-      penerima: row.penerima,
-      tgl: row.tgl,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      share_token: row.share_token
-    }));
+    // Map database field names to what frontend expects (1 row = 1 upload, files = array)
+    const mappedDocs = result.rows.map(mapDocRow);
 
     res.json(mappedDocs);
   } catch (err) {
@@ -286,6 +347,9 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/documents/share/:token — resolve share link (requires login)
+// 1 link = 1 upload: if the token belongs to a legacy split row (1 upload previously
+// stored as N rows, one per file), merge all sibling rows into a single response
+// so the recipient sees all files in that upload.
 router.get('/share/:token', async (req, res) => {
   try {
     const { token } = req.params;
@@ -300,20 +364,63 @@ router.get('/share/:token', async (req, res) => {
       return res.status(404).json({ error: 'Link tidak valid atau dokumen tidak ditemukan' });
     }
     const row = result.rows[0];
-    res.json({
-      id: row.id,
-      project_name: row.project_name,
-      document_type: row.document_type,
-      sub_tipe: row.sub_tipe,
-      document_name: row.document_name,
-      document_number: row.document_number,
-      description: row.description,
-      file: row.file_path,
-      senderName: row.sender_name,
-      senderDivision: row.sender_division,
-      penerima: row.penerima,
-      tgl: row.tgl,
-      share_token: row.share_token
+    const base = mapDocRow(row);
+    // New single-row multi-file uploads already contain all files — return as-is
+    if (base.files_count > 1) {
+      return res.json(base);
+    }
+    // Legacy: look for sibling rows from the same upload
+    // (same grouping key as frontend: document_number + sender + project + type + same minute)
+    let siblings = [row];
+    try {
+      if ((row.document_number || '').trim()) {
+        const sibRes = await db.query(
+          `SELECT * FROM shared_documents
+           WHERE COALESCE(TRIM(document_number), '') = $1
+             AND COALESCE(TRIM(sender_name), '') = $2
+             AND COALESCE(TRIM(project_name), '') = $3
+             AND COALESCE(TRIM(document_type), '') = $4
+             AND date_trunc('minute', tgl) = date_trunc('minute', $5::timestamptz)`,
+          [
+            (row.document_number || '').trim(),
+            (row.sender_name || '').trim(),
+            (row.project_name || '').trim(),
+            (row.document_type || '').trim(),
+            row.tgl
+          ]
+        );
+        if (sibRes.rows.length > 1) {
+          siblings = sibRes.rows;
+        }
+      }
+    } catch (e) {
+      console.error('Error finding share siblings:', e);
+      siblings = [row];
+    }
+    if (siblings.length <= 1) {
+      return res.json(base);
+    }
+    // Merge sibling files into one upload response
+    const mergedFiles = [];
+    const seen = new Set();
+    siblings.forEach(r => {
+      normalizeFiles(r).forEach(f => {
+        if (!seen.has(f.path)) { seen.add(f.path); mergedFiles.push(f); }
+      });
+    });
+    let displayName = row.document_name || '';
+    const prefixes = siblings.map(r => (r.document_name || '').split(' - ')[0].trim()).filter(Boolean);
+    if (prefixes.length === siblings.length && new Set(prefixes).size === 1) {
+      displayName = prefixes[0];
+    }
+    return res.json({
+      ...base,
+      document_name: displayName,
+      file: mergedFiles.length > 0 ? mergedFiles[0].path : base.file,
+      files: mergedFiles,
+      files_count: mergedFiles.length,
+      _groupIds: siblings.map(r => r.id),
+      _isGrouped: true
     });
   } catch (err) {
     console.error('Error resolving share link:', err);
@@ -354,59 +461,58 @@ router.post('/submit_document', upload.array('files', 20), async (req, res) => {
     }
     const penerimaString = recipientsArray.join(',');
 
-    const isMulti = files.length > 1;
-    const insertedDocs = [];
-    for (const file of files) {
-      const filePath = '/uploads/' + file.filename;
-      // Saat mengunggah beberapa file, nama dokumen ditambah nama file agar mudah dibedakan
-      const docName = isMulti
-        ? `${(document_name || 'Dokumen').trim()} - ${path.parse(file.originalname).name}`
-        : (document_name || '').trim();
+    // 1 upload = 1 row, semua file disimpan dalam kolom files (JSONB).
+    // file_path diisi file pertama untuk kompatibilitas dengan kode lama.
+    const filesPayload = files.map(file => ({
+      path: '/uploads/' + file.filename,
+      originalName: file.originalname,
+      size: file.size != null ? file.size : null
+    }));
+    const firstFilePath = filesPayload[0].path;
+    const docName = (document_name || '').trim();
 
-      const insertQuery = tgl
-        ? `INSERT INTO shared_documents 
-           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, tgl, share_token)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-           RETURNING *`
-        : `INSERT INTO shared_documents 
-           (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, sender_name, sender_division, user_id, penerima, share_token)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-           RETURNING *`;
+    const insertQuery = tgl
+      ? `INSERT INTO shared_documents
+         (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, files, sender_name, sender_division, user_id, penerima, tgl, share_token)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         RETURNING *`
+      : `INSERT INTO shared_documents
+         (project_name, document_type, sub_tipe, document_name, document_number, description, file_path, files, sender_name, sender_division, user_id, penerima, share_token)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         RETURNING *`;
 
-      const queryParams = [
-        project_name,
-        document_type,
-        sub_tipe || '',
-        docName,
-        document_number,
-        description || '',
-        filePath,
-        senderName || req.user.display_name,
-        senderDivision || req.user.division,
-        userId || req.user.id,
-        penerimaString
-      ];
-      if (tgl) {
-        queryParams.push(tgl);
-      }
-      queryParams.push(require('crypto').randomBytes(12).toString('hex'));
-
-      const result = await db.query(insertQuery, queryParams);
-      insertedDocs.push(result.rows[0]);
+    const queryParams = [
+      project_name,
+      document_type,
+      sub_tipe || '',
+      docName,
+      document_number,
+      description || '',
+      firstFilePath,
+      JSON.stringify(filesPayload),
+      senderName || req.user.display_name,
+      senderDivision || req.user.division,
+      userId || req.user.id,
+      penerimaString
+    ];
+    if (tgl) {
+      queryParams.push(tgl);
     }
+    queryParams.push(require('crypto').randomBytes(12).toString('hex'));
 
-    // Trigger In-App Notification (Socket.io) + Web Push untuk setiap dokumen
+    const result = await db.query(insertQuery, queryParams);
+    const newDoc = result.rows[0];
+
+    // Trigger In-App Notification (Socket.io) + Web Push sekali per upload (bukan per file)
     const io = req.app.get('io');
-    for (const newDoc of insertedDocs) {
-      if (io) {
-        io.emit('new_document_assigned', newDoc);
-      }
-      sendDocumentNotifications(newDoc, req, db, webpush).catch(err => {
-        console.error('Failed to send push notifications:', err);
-      });
+    if (io) {
+      io.emit('new_document_assigned', newDoc);
     }
+    sendDocumentNotifications(newDoc, req, db, webpush).catch(err => {
+      console.error('Failed to send push notifications:', err);
+    });
 
-    res.status(201).json({ message: 'Document uploaded successfully', count: insertedDocs.length, documents: insertedDocs });
+    res.status(201).json({ message: 'Document uploaded successfully', count: filesPayload.length, documents: [newDoc] });
   } catch (err) {
     console.error('Error submitting document:', err);
     if (req.files) {
@@ -685,7 +791,7 @@ async function checkDocumentAccess(doc, user) {
   return doc.sender_name === displayName || hasGroupAccess;
 }
 
-// GET /api/documents/preview/:id
+// GET /api/documents/preview/:id — supports ?f=<filename> or ?i=<index> for multi-file docs (1 row = 1 upload)
 router.get('/preview/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -699,7 +805,18 @@ router.get('/preview/:id', async (req, res) => {
       return res.status(403).send('Anda tidak memiliki akses ke dokumen ini');
     }
 
-    const filePath = path.join(__dirname, '../..', doc.file_path);
+    const files = normalizeFiles(doc);
+    let target = files[0] ? files[0].path : doc.file_path;
+    if (req.query.i != null && req.query.i !== '') {
+      const idx = parseInt(req.query.i, 10);
+      if (!isNaN(idx) && files[idx]) target = files[idx].path;
+    } else if (req.query.f) {
+      const want = path.basename(String(req.query.f));
+      const found = files.find(f => path.basename(f.path) === want);
+      if (found) target = found.path;
+    }
+
+    const filePath = path.join(__dirname, '../..', target);
     if (!fs.existsSync(filePath)) {
       return res.status(404).send('File not found on server');
     }
@@ -721,9 +838,19 @@ router.get('/viewonly', async (req, res) => {
   const dbPath = '/uploads/' + filename;
 
   try {
-    const docResult = await db.query('SELECT * FROM shared_documents WHERE file_path = $1', [dbPath]);
+    let docResult = await db.query('SELECT * FROM shared_documents WHERE file_path = $1', [dbPath]);
     if (docResult.rows.length === 0) {
-      return res.status(404).send('Document not found');
+      // File may be the 2nd..nth file of a multi-file upload (stored in files JSONB)
+      docResult = await db.query('SELECT * FROM shared_documents WHERE files @> $1::jsonb', [JSON.stringify([{ path: dbPath }])]);
+    }
+    if (docResult.rows.length === 0) {
+      // Fallback: match any file basename inside files array
+      const allDocs = await db.query('SELECT * FROM shared_documents');
+      const match = allDocs.rows.find(r => normalizeFiles(r).some(f => path.basename(f.path) === filename));
+      if (!match) {
+        return res.status(404).send('Document not found');
+      }
+      docResult = { rows: [match] };
     }
 
     const doc = docResult.rows[0];
@@ -802,10 +929,16 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Anda tidak memiliki hak untuk menghapus dokumen ini' });
     }
 
-    // Delete physical file
-    const filePath = path.join(__dirname, '../..', doc.file_path);
-    if (fs.existsSync(filePath)) {
-      try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting file:', e); }
+    // Delete all physical files in this upload (1 row may hold multiple files)
+    const filesToDelete = normalizeFiles(doc);
+    if (doc.file_path && !filesToDelete.some(f => f.path === doc.file_path)) {
+      filesToDelete.push({ path: doc.file_path });
+    }
+    for (const f of filesToDelete) {
+      const filePath = path.join(__dirname, '../..', f.path);
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting file:', e); }
+      }
     }
 
     await db.query('DELETE FROM shared_documents WHERE id = $1', [id]);
@@ -838,10 +971,16 @@ router.post('/bulk_delete', async (req, res) => {
         continue;
       }
 
-      // Delete physical file
-      const filePath = path.join(__dirname, '../..', doc.file_path);
-      if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting file:', e); }
+      // Delete all physical files in this upload (1 row may hold multiple files)
+      const filesToDelete = normalizeFiles(doc);
+      if (doc.file_path && !filesToDelete.some(f => f.path === doc.file_path)) {
+        filesToDelete.push({ path: doc.file_path });
+      }
+      for (const f of filesToDelete) {
+        const filePath = path.join(__dirname, '../..', f.path);
+        if (fs.existsSync(filePath)) {
+          try { fs.unlinkSync(filePath); } catch (e) { console.error('Error deleting file:', e); }
+        }
       }
 
       await db.query('DELETE FROM shared_documents WHERE id = $1', [id]);

@@ -91,7 +91,30 @@
       const fileUrl = `/uploads/${filename.replace(/\\/g, '/').split('/').pop()}`;
       const downloadBtn = document.getElementById('download-btn');
       downloadBtn.href = fileUrl;
-      downloadBtn.download = filename.split('/').pop();
+      // Unduh aman: validasi dulu agar tidak menyimpan halaman error sebagai file.
+      // Nama simpannya pakai nama asli (param name), bukan nama simpanan acak.
+      downloadBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          const res = await fetch(fileUrl);
+          const ct = (res.headers.get('content-type') || '').toLowerCase();
+          if (!res.ok || ct.includes('text/html')) {
+            alert('Gagal mengunduh: file tidak ditemukan di server ini. Kemungkinan file diunggah dari server lain.');
+            return;
+          }
+          const blob = await res.blob();
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = docName || filename.split('/').pop();
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(u), 8000);
+        } catch (err) {
+          alert('Gagal mengunduh file: tidak dapat terhubung ke server.');
+        }
+      });
       
       const content = document.getElementById('content');
       const ext = getFileExtension(filename);

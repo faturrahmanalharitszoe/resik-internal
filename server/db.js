@@ -177,6 +177,12 @@ async function runMigrations() {
       ALTER TABLE shared_documents
       ADD COLUMN IF NOT EXISTS share_token VARCHAR(64);
     `);
+
+    // 6c. Add files column for multi-file upload in one row (JSONB array of {path, originalName, size})
+    await pool.query(`
+      ALTER TABLE shared_documents
+      ADD COLUMN IF NOT EXISTS files JSONB DEFAULT '[]'::jsonb;
+    `);
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_documents_share_token
       ON shared_documents(share_token) WHERE share_token IS NOT NULL;
@@ -195,6 +201,50 @@ async function runMigrations() {
     }
     if (missingTokenRows.rows.length > 0) {
       console.log(`✅ Share token dibuat untuk ${missingTokenRows.rows.length} dokumen lama.`);
+    }
+
+    // Backfill files column from file_path for old single-file rows.
+    // Recover original filename from document_name suffix ("Nama - namaasli") + stored extension.
+    await pool.query(`
+      UPDATE shared_documents
+      SET files = jsonb_build_array(jsonb_build_object(
+        'path', file_path,
+        'originalName', CASE
+          WHEN document_name LIKE '% - %' THEN
+            CASE
+              WHEN substring(document_name from ' - (.*)$') LIKE '%.%' THEN substring(document_name from ' - (.*)$')
+              ELSE substring(document_name from ' - (.*)$') || substring(file_path from '\.[^.]*$')
+            END
+          ELSE split_part(file_path, '/', 3)
+        END,
+        'size', NULL
+      ))
+      WHERE files IS NULL OR files = '[]'::jsonb;
+    `);
+    // Repair: rows whose files[0].originalName is still the generated stored name
+    // (e.g. "1787...-1234.pptx") — recompute from document_name suffix.
+    try {
+      const uglyRows = await pool.query(`
+        SELECT id, file_path, document_name, files FROM shared_documents
+        WHERE files IS NOT NULL AND jsonb_array_length(files) = 1
+          AND (files->0->>'originalName') ~ '^[0-9]+-[0-9]+\\.'
+          AND document_name LIKE '% - %'
+      `);
+      for (const r of uglyRows.rows) {
+        const stored = String(r.file_path || '').split('/').pop();
+        const ext = stored.includes('.') ? stored.substring(stored.lastIndexOf('.')) : '';
+        const suffix = String(r.document_name).substring(String(r.document_name).lastIndexOf(' - ') + 3).trim();
+        if (!suffix) continue;
+        const friendly = ext && suffix.toLowerCase().endsWith(ext.toLowerCase()) ? suffix : suffix + ext;
+        const cur = Array.isArray(r.files) ? r.files[0] : {};
+        const fixed = [{ path: cur.path || r.file_path, originalName: friendly, size: cur.size != null ? cur.size : null }];
+        await pool.query('UPDATE shared_documents SET files = $1::jsonb WHERE id = $2', [JSON.stringify(fixed), r.id]);
+      }
+      if (uglyRows.rows.length > 0) {
+        console.log(`✅ Nama file asli dipulihkan untuk ${uglyRows.rows.length} dokumen lama.`);
+      }
+    } catch (e) {
+      console.error('Repair originalName gagal (non-fatal):', e.message);
     }
 
     // 7. Create notion_pages table
